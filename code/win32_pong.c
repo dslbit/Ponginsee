@@ -20,6 +20,8 @@ MessageBoxW(0, L"Expression: " TO_STRING(_exp) L"\n\nAt line: " TO_STRING(__LINE
 #define ASSERT(_exp)
 #endif
 
+#define CAST(_x) (_x)
+
 #define FRONT_BUFFER_WIDTH (640) /*(1280)*/
 #define FRONT_BUFFER_HEIGHT (360) /*(720)*/
 #define BACK_BUFFER_WIDTH (640)
@@ -33,6 +35,15 @@ MessageBoxW(0, L"Expression: " TO_STRING(_exp) L"\n\nAt line: " TO_STRING(__LINE
 GLOBAL int global_running = FALSE;
 GLOBAL void *global_back_buffer_memory;
 GLOBAL BITMAPINFO global_back_buffer_bmp_info;
+
+INTERNAL void draw_pixel(void *back_buffer, int x, int y, int color) {
+  LOCAL int *pixel;
+  
+  if (x > BACK_BUFFER_WIDTH || x < 0) return;
+  if (y > BACK_BUFFER_HEIGHT || y < 0) return;
+  pixel = (CAST(int *) back_buffer) + (y * BACK_BUFFER_STRIDE) + (x * BACK_BUFFER_BYTES_PER_PIXEL);
+  *pixel = color; /* AARRGGBB */
+}
 
 INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wparam, LPARAM lparam) {
   LRESULT result;
@@ -134,11 +145,13 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
         DispatchMessageW(&window_msg);
       }
       
-      /* TODO: Setup a CPU framebuffer and paint a pixel on it */
+      /* Update & Render */
       {
-        
         LOCAL int release_dc_result;
         HDC window_dc;
+        
+        /* draw a pixel at 0,0 */
+        draw_pixel(global_back_buffer_memory, 0, 0, 0xFFFF0000);
         
         window_dc = GetDC(window);
         /*ASSERT(window_dc != 0);*/
