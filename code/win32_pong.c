@@ -36,13 +36,36 @@ GLOBAL int global_running = FALSE;
 GLOBAL void *global_back_buffer_memory;
 GLOBAL BITMAPINFO global_back_buffer_bmp_info;
 
-INTERNAL void draw_pixel(void *back_buffer, int x, int y, int color) {
+INTERNAL void draw_pixel(int x, int y, int color) {
   LOCAL int *pixel;
   
   if (x > BACK_BUFFER_WIDTH || x < 0) return;
   if (y > BACK_BUFFER_HEIGHT || y < 0) return;
-  pixel = (CAST(int *) back_buffer) + (y * BACK_BUFFER_STRIDE) + (x * BACK_BUFFER_BYTES_PER_PIXEL);
+  pixel = CAST(int *) ((CAST(unsigned char *) global_back_buffer_memory) + (y * BACK_BUFFER_STRIDE) + (x * BACK_BUFFER_BYTES_PER_PIXEL));
   *pixel = color; /* AARRGGBB */
+}
+
+INTERNAL void draw_rect(int x, int y, int width, int height, int color) {
+  int i, j;
+  LOCAL int *pixel;
+  
+  width = (x + width); /* make width be end_x */
+  if (width < 0) width = 0;
+  if (width > BACK_BUFFER_WIDTH) width = BACK_BUFFER_WIDTH;
+  height = (y + height); /* make height be end_y */
+  if (height < 0) height = 0;
+  if (height > BACK_BUFFER_HEIGHT) height = BACK_BUFFER_HEIGHT;
+  if (x < 0) x = 0;
+  if (x >  BACK_BUFFER_WIDTH) x = BACK_BUFFER_WIDTH;
+  if (y < 0) y = 0;
+  if (y > BACK_BUFFER_HEIGHT) y = BACK_BUFFER_HEIGHT;
+  for (i = y; i < height; ++i) {
+    pixel =CAST(int *) ((CAST(unsigned char *) global_back_buffer_memory) + (i * BACK_BUFFER_STRIDE) + (x * BACK_BUFFER_BYTES_PER_PIXEL));
+    for (j = x; j < width; ++j) {
+      *pixel = color;
+      pixel++;
+    }
+  }
 }
 
 INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wparam, LPARAM lparam) {
@@ -150,8 +173,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
         LOCAL int release_dc_result;
         HDC window_dc;
         
-        /* draw a pixel at 0,0 */
-        draw_pixel(global_back_buffer_memory, 0, 0, 0xFFFF0000);
+        /* draw a rect at 100,100 */
+        draw_rect(BACK_BUFFER_WIDTH-1, BACK_BUFFER_HEIGHT-1, 10, 10, 0xFFFF0000);
         
         window_dc = GetDC(window);
         /*ASSERT(window_dc != 0);*/
