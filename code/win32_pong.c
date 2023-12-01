@@ -35,6 +35,7 @@ MessageBoxW(0, L"Expression: " TO_STRING(_exp) L"\n\nAt line: " TO_STRING(__LINE
 GLOBAL int global_running = FALSE;
 GLOBAL void *global_back_buffer_memory;
 GLOBAL BITMAPINFO global_back_buffer_bmp_info;
+GLOBAL BOOL move_up, move_down, move_left, move_right; // W, S, A, D - respectively
 
 INTERNAL void draw_pixel(int x, int y, int color) {
   LOCAL int *pixel;
@@ -94,6 +95,16 @@ INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wp
       back_buffer_mem_size = (BACK_BUFFER_WIDTH * BACK_BUFFER_HEIGHT) * BACK_BUFFER_BYTES_PER_PIXEL;
       global_back_buffer_memory = VirtualAlloc(0, back_buffer_mem_size, (MEM_RESERVE | MEM_COMMIT), PAGE_READWRITE);
       ASSERT(back_buffer_mem_size != 0);
+    } break;
+    
+    case WM_KEYDOWN: {
+      DWORD key;
+      
+      key = CAST(DWORD) wparam;
+      if (key == 'W') { move_up    = TRUE; }
+      if (key == 'S') { move_down  = TRUE; }
+      if (key == 'A') { move_left  = TRUE; }
+      if (key == 'D') { move_right = TRUE; }
     } break;
     
     case WM_CLOSE: {
@@ -160,9 +171,16 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
   /* Game window message loop */
   {
     MSG window_msg = {0};
+    int rect_x, rect_y;
     
+    rect_x = rect_y = 0;
     global_running = TRUE;
     while (global_running) {
+      // Reset per frame input state
+      {
+        move_up = move_down = move_left = move_right = FALSE;
+      }
+      
       while (PeekMessageW(&window_msg, 0, 0, 0, PM_REMOVE)) {
         TranslateMessage(&window_msg);
         DispatchMessageW(&window_msg);
@@ -172,9 +190,19 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
       {
         LOCAL int release_dc_result;
         HDC window_dc;
+        LOCAL int rect_move_speed = 10;
+        
+        
+        if (move_up)    { rect_y -= rect_move_speed; }
+        if (move_down)  { rect_y += rect_move_speed; }
+        if (move_left)  { rect_x -= rect_move_speed; }
+        if (move_right) { rect_x += rect_move_speed; }
+        
+        // Dirty clear background before drawing
+        draw_rect(0, 0, BACK_BUFFER_WIDTH, BACK_BUFFER_HEIGHT, 0x00000000);
         
         /* draw a rect at 100,100 */
-        draw_rect(BACK_BUFFER_WIDTH-1, BACK_BUFFER_HEIGHT-1, 10, 10, 0xFFFF0000);
+        draw_rect(50+rect_x, 50+rect_y, 80, 45, 0xFFFF0000);
         
         window_dc = GetDC(window);
         /*ASSERT(window_dc != 0);*/
