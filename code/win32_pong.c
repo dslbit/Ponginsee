@@ -22,8 +22,11 @@ MessageBoxW(0, L"Expression: " TO_STRING(_exp) L"\n\nAt line: " TO_STRING(__LINE
 
 #define CAST(_x) (_x)
 
-#define FRONT_BUFFER_WIDTH (640) /*(1280)*/
-#define FRONT_BUFFER_HEIGHT (360) /*(720)*/
+#define ARRAY_LENGTH(_x) (sizeof((_x)) / sizeof((_x[0]))) /* in number of elements */
+/* TODO: This can go away once 'game_layer' enters the room */
+/* 640/360, 1280/720*/
+#define FRONT_BUFFER_WIDTH (640)
+#define FRONT_BUFFER_HEIGHT (360)
 #define BACK_BUFFER_WIDTH (640)
 #define BACK_BUFFER_HEIGHT (360)
 #define BACK_BUFFER_BITS_PER_PIXEL (32)
@@ -31,12 +34,16 @@ MessageBoxW(0, L"Expression: " TO_STRING(_exp) L"\n\nAt line: " TO_STRING(__LINE
 #define BACK_BUFFER_STRIDE (BACK_BUFFER_WIDTH * BACK_BUFFER_BYTES_PER_PIXEL)
 
 #include <windows.h>
+#include <strsafe.h>
 
+/* TODO: Pack into a struct and move to a 'game_layer' */
 GLOBAL int global_running = FALSE;
 GLOBAL void *global_back_buffer_memory;
 GLOBAL BITMAPINFO global_back_buffer_bmp_info;
-GLOBAL BOOL move_up, move_down, move_left, move_right; // W, S, A, D - respectively
+GLOBAL BOOL move_up, move_down, move_left, move_right; /* W, S, A, D - respectively */
+GLOBAL float dt; /* this is actually 'last_frame_dt' */
 
+/* TODO: Move to a 'game_layer' */
 INTERNAL void draw_pixel(int x, int y, int color) {
   LOCAL int *pixel;
   
@@ -46,6 +53,7 @@ INTERNAL void draw_pixel(int x, int y, int color) {
   *pixel = color; /* AARRGGBB */
 }
 
+/* TODO: Move to a 'game_layer' */
 INTERNAL void draw_rect(int x, int y, int width, int height, int color) {
   int i, j;
   LOCAL int *pixel;
@@ -97,6 +105,7 @@ INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wp
       ASSERT(back_buffer_mem_size != 0);
     } break;
     
+    /* TODO: Proper input */
     case WM_KEYDOWN: {
       DWORD key;
       
@@ -171,12 +180,15 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
   /* Game window message loop */
   {
     MSG window_msg = {0};
-    int rect_x, rect_y;
+    float rect_x, rect_y;
+    LOCAL LARGE_INTEGER current_perf_counter = {0}, last_perf_counter = {0}, perf_frequency = {0};
     
     rect_x = rect_y = 0;
+    ASSERT(QueryPerformanceFrequency(&perf_frequency) != 0); /* this is the CPU ticks_per_second capability - TODO: maybe do some crazy shit if this fails */
+    ASSERT(QueryPerformanceCounter(&last_perf_counter) != 0);
     global_running = TRUE;
     while (global_running) {
-      // Reset per frame input state
+      /* Reset per frame input state */
       {
         move_up = move_down = move_left = move_right = FALSE;
       }
@@ -190,19 +202,19 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
       {
         LOCAL int release_dc_result;
         HDC window_dc;
-        LOCAL int rect_move_speed = 10;
+        LOCAL float rect_move_speed; /* 10 meters per second */
         
-        
+        rect_move_speed = 5000.0f * dt;
         if (move_up)    { rect_y -= rect_move_speed; }
         if (move_down)  { rect_y += rect_move_speed; }
         if (move_left)  { rect_x -= rect_move_speed; }
         if (move_right) { rect_x += rect_move_speed; }
         
-        // Dirty clear background before drawing
+        /* Dirty clear background before drawing, TODO: a proper 'draw_background' */
         draw_rect(0, 0, BACK_BUFFER_WIDTH, BACK_BUFFER_HEIGHT, 0x00000000);
         
         /* draw a rect at 100,100 */
-        draw_rect(50+rect_x, 50+rect_y, 80, 45, 0xFFFF0000);
+        draw_rect(50 + CAST(int) rect_x, 50 + CAST(int) rect_y, 80, 45, 0xFFFF0000);
         
         window_dc = GetDC(window);
         /*ASSERT(window_dc != 0);*/
@@ -211,6 +223,37 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
         if (window_dc != 0) { /* This check exist's because when the window minimized this is 0 */
           release_dc_result = ReleaseDC(window, window_dc);
           ASSERT(release_dc_result != 0);
+        }
+        
+        /* Timing */
+        {
+          LOCAL LARGE_INTEGER perf_counter_diff = {0};
+          LOCAL float elapsed_secs, elapsed_ms, elapsed_microsecs, elapsed_nanosecs = 0.0f;
+          LOCAL int fps;
+          
+          ASSERT(QueryPerformanceCounter(&current_perf_counter) != 0); /* TODO: Maybe do something smart here if it fails for some reason */
+          
+          perf_counter_diff.QuadPart = current_perf_counter.QuadPart - last_perf_counter.QuadPart; /* counts elapsed */
+          elapsed_secs = CAST(float) perf_counter_diff.QuadPart / CAST(float) perf_frequency.QuadPart; /* counts per second */
+          elapsed_ms          = elapsed_secs * 1000.0f;
+          elapsed_microsecs   = elapsed_secs * 1000000.0f;
+          elapsed_nanosecs    = elapsed_secs * 1000000000.0f;
+          fps = CAST(int) (1.0f / elapsed_secs); /*CAST(int) (perf_frequency.QuadPart / perf_counter_diff.QuadPart);*/
+          dt = 1.0f / fps; /* 'delta time' should be used when we want something to NOT BE frame rate dependent */
+          // NOTE: Debug 'time' print in the Visual Studio debugger
+          {
+            LOCAL int print_counter;
+            wchar_t buffer[1024];
+            
+            ++print_counter;
+            if (print_counter > 1000) {
+              print_counter = 0;
+              StringCbPrintfW(buffer, ARRAY_LENGTH(buffer), L"%dfps\t%fs\t%fms\t%fµs\t%fns\n", fps, elapsed_secs, elapsed_ms, elapsed_microsecs, elapsed_nanosecs);
+              OutputDebugStringW(buffer);
+            }
+          }
+          
+          last_perf_counter = current_perf_counter;
         }
       }
       
