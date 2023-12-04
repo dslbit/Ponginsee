@@ -15,6 +15,8 @@
 
 #define ARRAY_COUNT(_x) (sizeof((_x)) / sizeof((_x[0]))) /* in number of elements */
 
+#define MIN(_x, _y) ((_x) < (_y) ? (_x) : (_y))
+
 /* TODO: Types and later make it precise using compiler checks, c version checks and 'stdint.h' */
 typedef signed   int        B32;
 
@@ -27,6 +29,9 @@ typedef signed   char       S8;
 typedef signed   short      S16;
 typedef signed   int        S32;
 typedef signed   long long  S64;
+
+typedef float               F32;
+typedef double              F64;
 
 typedef struct GameBackBuffer GameBackBuffer;
 struct GameBackBuffer {

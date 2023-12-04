@@ -34,12 +34,12 @@ INTERNAL void draw_rect(GameBackBuffer *back_buffer, S32 x, S32 y, S32 width, S3
   }
 }
 
-/* TODO: Platform-independent: user input, game memory, sound output, file I/O */
+/* TODO: Platform-independent: game memory, sound output, file I/O */
 INTERNAL void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input) {
   LOCAL float rect_x, rect_y;
   LOCAL float rect_move_speed;
   
-  rect_move_speed = 250.0f * input->dt;
+  rect_move_speed = 15000.0f * input->dt;
   if (input->player1.up.pressed)    { rect_y -= rect_move_speed; }
   if (input->player1.down.pressed)  { rect_y += rect_move_speed; }
   if (input->player1.left.pressed)  { rect_x -= rect_move_speed; }

@@ -6,6 +6,7 @@
 #if defined(WIN32_DEBUG)
 #define ASSERT(_exp, _msg) if (!(_exp)) {\
 MessageBoxW(0, L"Expression: " TO_STRING(_exp) L"\n" _msg L"\n\nAt line: " TO_STRING(__LINE__) L"\n\nIn: " __FILE__, L"Assertion Failed", (MB_ICONERROR | MB_OK));\
+__debugbreak();\
 *((int *) 0) = 0;\
 }
 #else
@@ -23,6 +24,7 @@ MessageBoxW(0, L"Expression: " TO_STRING(_exp) L"\n" _msg L"\n\nAt line: " TO_ST
 
 #include <windows.h>
 #include <strsafe.h>
+#include <wchar.h>
 
 typedef struct Win32BackBuffer Win32BackBuffer;
 struct Win32BackBuffer {
@@ -34,6 +36,16 @@ struct Win32BackBuffer {
 
 GLOBAL int global_running = FALSE;
 GLOBAL Win32BackBuffer win32_back_buffer;
+
+INTERNAL void WIN32_DEBUG_PRINT(wchar_t *msg, ...) {
+  LOCAL wchar_t formated_msg[1024];
+  va_list args;
+  
+  va_start(args, msg);
+  vswprintf_s(formated_msg, ARRAY_COUNT(formated_msg), msg, args);
+  va_end(args);
+  OutputDebugStringW(formated_msg);
+}
 
 INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wparam, LPARAM lparam) {
   LRESULT result;
@@ -92,7 +104,6 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
   WNDCLASSEXW window_class = {0};
   HWND window;
   
-  ASSERT(0, L"This is ZERO!");
   window_class.cbSize = sizeof(window_class);
   window_class.style = (CS_VREDRAW | CS_HREDRAW);
   window_class.hInstance = instance;
@@ -140,8 +151,19 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
     GameBackBuffer game_back_buffer = {0};
     GameInput game_input = {0};
     LARGE_INTEGER current_perf_counter = {0}, last_perf_counter = {0}, perf_frequency = {0};
+    U32 sleep_granularity;
+    float raw_elapsed_ms, cooked_elapsed_ms;
     float dt; /* this is actually 'last_frame_dt' */
     
+    /* NOTE: Trying to apply high resolution Windows timers for precise sleeping */
+    {
+      TIMECAPS machine_timing_caps;
+      
+      /* TODO: Actually this is fine if it fails, in the future just set to 1 by default, but for now I'll do this way in debug mode. */
+      ASSERT(timeGetDevCaps(&machine_timing_caps, sizeof(machine_timing_caps)) == MMSYSERR_NOERROR, L"Couldn't get machine timing capabilities using 'timeGetDevCaps(...)'!");
+      ASSERT(timeBeginPeriod(MIN(machine_timing_caps.wPeriodMin, machine_timing_caps.wPeriodMax)) == TIMERR_NOERROR, L"Couldn't set the Windows' timer resoltuion using 'timeBeginPeriod(...)'!");
+      sleep_granularity = MIN(machine_timing_caps.wPeriodMin, machine_timing_caps.wPeriodMax);
+    }
     ASSERT(QueryPerformanceFrequency(&perf_frequency) != 0, L"Couldn't get processor \'performance frequency\' - \'QueryPerformanceFrequency(...)\' shouldn't return 0!"); /* this is the CPU ticks_per_second capability - TODO: maybe do some crazy shit if this fails */
     ASSERT(QueryPerformanceCounter(&last_perf_counter) != 0, L"Couldn't get processor \'performance counter\' - \'QueryPerformanceCounter(...)\' shouldn't return 0!");
     dt = 0.0f;
@@ -230,16 +252,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
         game_input.dt = dt;
         game_update_and_render(&game_back_buffer, &game_input);
         
-        window_dc = GetDC(window);
-        /*ASSERT(window_dc != 0);*/
-        /* NOTE: BitBlt is faster than SctretchDIBits, maybe, in the future, change to BitBlt and do a bitmap resize by hand for the 'front buffer'? */
-        StretchDIBits(window_dc, 0, 0, WIN32_FRONT_BUFFER_WIDTH, WIN32_FRONT_BUFFER_HEIGHT, 0, 0, game_back_buffer.width, game_back_buffer.height, game_back_buffer.memory, &win32_back_buffer.bmp_info, DIB_RGB_COLORS, SRCCOPY);
-        if (window_dc != 0) { /* This check exist's because when the window minimized this is 0 */
-          release_dc_result = ReleaseDC(window, window_dc);
-          ASSERT(release_dc_result != 0, L"Windows failed to release the main window device context!");
-        }
-        
-        /* Timing */
+        /* NOTE: Timing */
         {
           LOCAL LARGE_INTEGER perf_counter_diff = {0};
           LOCAL float elapsed_secs, elapsed_ms, elapsed_microsecs, elapsed_nanosecs = 0.0f;
@@ -254,24 +267,57 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
           elapsed_nanosecs    = elapsed_secs * 1000000000.0f;
           fps = CAST(int) (1.0f / elapsed_secs); /*CAST(int) (perf_frequency.QuadPart / perf_counter_diff.QuadPart);*/
           dt = 1.0f / fps; /* 'delta time' should be used when we want something to NOT BE frame rate dependent */
-          /* NOTE: Debug 'time' print in the Visual Studio debugger */
-          {
-            LOCAL int print_counter;
-            wchar_t buffer[1024];
-            
-            ++print_counter;
-            if (print_counter > 1000) {
-              print_counter = 0;
-              StringCbPrintfW(buffer, ARRAY_COUNT(buffer), L"%fs\t%fms\t%fµs\t%fns\n", elapsed_secs, elapsed_ms, elapsed_microsecs, elapsed_nanosecs);
-              OutputDebugStringW(buffer);
-            }
-          }
           
-          last_perf_counter = current_perf_counter;
+          raw_elapsed_ms = elapsed_ms;
+          
+          /* NOTE: CPU Sleep if too fast */
+          {
+            LOCAL F32 desired_ms_per_frame = 16.0f; /* aprox. equivalent to 60 FPS - TODO: get the monitor refresh rate later */
+            LOCAL F32 elapsed_to_desired_ms_diff;
+            
+            ASSERT(QueryPerformanceCounter(&current_perf_counter) != 0, L"Couldn't get processor \'performance counter\' - \'QueryPerformanceCounter(...)\' shouldn't return 0!");
+            elapsed_ms = ((current_perf_counter.QuadPart - last_perf_counter.QuadPart) * 1000.0f) / (F32) perf_frequency.QuadPart;
+            elapsed_to_desired_ms_diff = (desired_ms_per_frame - elapsed_ms);
+            if (elapsed_ms < desired_ms_per_frame) {
+              Sleep(CAST(S32) elapsed_to_desired_ms_diff);
+              
+              ASSERT(QueryPerformanceCounter(&current_perf_counter) != 0, L"Couldn't get processor \'performance counter\' - \'QueryPerformanceCounter(...)\' shouldn't return 0!");
+              elapsed_ms = ((current_perf_counter.QuadPart - last_perf_counter.QuadPart) * 1000.0f) / (F32) perf_frequency.QuadPart;
+              elapsed_to_desired_ms_diff = (desired_ms_per_frame - elapsed_ms);
+              ASSERT(elapsed_to_desired_ms_diff < desired_ms_per_frame, L"Game loop slept for too long, that's bad!");
+              while (elapsed_ms < desired_ms_per_frame) {
+                ASSERT(QueryPerformanceCounter(&current_perf_counter) != 0, L"Couldn't get processor \'performance counter\' - \'QueryPerformanceCounter(...)\' shouldn't return 0!");
+                elapsed_ms = ((current_perf_counter.QuadPart - last_perf_counter.QuadPart) * 1000.0f) / (F32) perf_frequency.QuadPart;
+              }
+              cooked_elapsed_ms = ((current_perf_counter.QuadPart - last_perf_counter.QuadPart) * 1000.0f) / perf_frequency.QuadPart;
+              /* NOTE: Debug 'time' print in the Visual Studio debugger */
+              {
+                LOCAL int print_counter = 1;
+                
+                ++print_counter;
+                if (print_counter > 10) {
+                  print_counter = 0;
+                  WIN32_DEBUG_PRINT(L"Raw MS: %fms\tCooked MS: %fms\n", raw_elapsed_ms, cooked_elapsed_ms);
+                }
+              }
+            }
+            
+          }
+        }
+        
+        /* NOTE: This should be done last. First we 'wait' and then display the frame. */
+        window_dc = GetDC(window);
+        /*ASSERT(window_dc != 0);*/
+        /* NOTE: BitBlt is faster than SctretchDIBits, maybe, in the future, change to BitBlt and do a bitmap resize by hand for the 'front buffer'? */
+        StretchDIBits(window_dc, 0, 0, WIN32_FRONT_BUFFER_WIDTH, WIN32_FRONT_BUFFER_HEIGHT, 0, 0, game_back_buffer.width, game_back_buffer.height, game_back_buffer.memory, &win32_back_buffer.bmp_info, DIB_RGB_COLORS, SRCCOPY);
+        if (window_dc != 0) { /* This check exist's because when the window minimized this is 0 */
+          release_dc_result = ReleaseDC(window, window_dc);
+          ASSERT(release_dc_result != 0, L"Windows failed to release the main window device context!");
         }
       }
       
-      
+      ASSERT(QueryPerformanceCounter(&current_perf_counter) != 0, L"Couldn't get processor \'performance counter\' - \'QueryPerformanceCounter(...)\' shouldn't return 0!");
+      last_perf_counter = current_perf_counter;
     };
   }
   return 0;
