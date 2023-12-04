@@ -3,16 +3,15 @@
 #define _UNICODE
 #define UNICODE
 
-#if defined(DEBUG)
-#define ASSERT(_exp) if (!(_exp)) {\
-MessageBoxW(0, L"Expression: " TO_STRING(_exp) L"\n\nAt line: " TO_STRING(__LINE__) L"\n\nIn: " __FILE__, L"Assertion Failed", (MB_ICONERROR | MB_OK));\
+#if defined(WIN32_DEBUG)
+#define ASSERT(_exp, _msg) if (!(_exp)) {\
+MessageBoxW(0, L"Expression: " TO_STRING(_exp) L"\n" _msg L"\n\nAt line: " TO_STRING(__LINE__) L"\n\nIn: " __FILE__, L"Assertion Failed", (MB_ICONERROR | MB_OK));\
 *((int *) 0) = 0;\
 }
 #else
 #define ASSERT(_exp)
 #endif
 
-/* TODO: This can go away once 'game_layer' enters the room */
 /* 640/360, 1280/720*/
 #define WIN32_FRONT_BUFFER_WIDTH (640)
 #define WIN32_FRONT_BUFFER_HEIGHT (360)
@@ -33,11 +32,8 @@ struct Win32BackBuffer {
   S32 height;
 };
 
-/* TODO: Pack into a struct and move to a 'game_layer' */
 GLOBAL int global_running = FALSE;
 GLOBAL Win32BackBuffer win32_back_buffer;
-GLOBAL BOOL move_up, move_down, move_left, move_right; /* W, S, A, D - respectively */
-GLOBAL float dt; /* this is actually 'last_frame_dt' */
 
 INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wparam, LPARAM lparam) {
   LRESULT result;
@@ -66,19 +62,15 @@ INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wp
       win32_back_buffer.bmp_info.bmiHeader.biCompression = BI_RGB;
       back_buffer_mem_size = (WIN32_BACK_BUFFER_WIDTH * WIN32_BACK_BUFFER_HEIGHT) * WIN32_BACK_BUFFER_BYTES_PER_PIXEL;
       win32_back_buffer.memory = VirtualAlloc(0, back_buffer_mem_size, (MEM_RESERVE | MEM_COMMIT), PAGE_READWRITE);
-      ASSERT(back_buffer_mem_size != 0);
+      ASSERT(back_buffer_mem_size != 0, L"Coun't allocate enough memory for the game \'back buffer\'!");
       
     } break;
     
-    /* TODO: Proper input */
-    case WM_KEYDOWN: {
-      DWORD key;
-      
-      key = CAST(DWORD) wparam;
-      if (key == 'W') { move_up    = TRUE; }
-      if (key == 'S') { move_down  = TRUE; }
-      if (key == 'A') { move_left  = TRUE; }
-      if (key == 'D') { move_right = TRUE; }
+    case WM_KEYDOWN:
+    case WM_KEYUP:
+    case WM_SYSKEYDOWN:
+    case WM_SYSKEYUP: {
+      ASSERT(0, L"Keyboard input shoudn't go though here!");
     } break;
     
     case WM_CLOSE: {
@@ -100,6 +92,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
   WNDCLASSEXW window_class = {0};
   HWND window;
   
+  ASSERT(0, L"This is ZERO!");
   window_class.cbSize = sizeof(window_class);
   window_class.style = (CS_VREDRAW | CS_HREDRAW);
   window_class.hInstance = instance;
@@ -111,7 +104,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
     ATOM id_result;
     
     id_result = RegisterClassExW(&window_class);
-    ASSERT(id_result != 0);
+    ASSERT(id_result != 0, L"Couldn't register the main window class for the game!");
   }
   /* Window creation */
   {
@@ -127,17 +120,17 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
     rect.bottom = WIN32_FRONT_BUFFER_HEIGHT;
     window_styles = (WS_OVERLAPPEDWINDOW | WS_VISIBLE);
     error_result = AdjustWindowRect(&rect, window_styles, FALSE);
-    ASSERT(error_result != 0);
+    ASSERT(error_result != 0, L"Couldn't \'AdjustWindowRect(...)\' for the main window!");
     window_width = rect.right - rect.left;
     window_height = rect.bottom - rect.top;
     monitor_width = GetSystemMetrics(SM_CXSCREEN);
-    ASSERT(monitor_width != 0);
+    ASSERT(monitor_width != 0, L"Couldn't get \'monitor_width\' using \'GetSystemMetrics(...)\'!");
     monitor_height = GetSystemMetrics(SM_CYSCREEN);
-    ASSERT(monitor_height != 0);
+    ASSERT(monitor_height != 0, L"Couldn't get \'monitor_height\' using \'GetSystemMetrics(...)\'!");
     window_x = (monitor_width - window_width) / 2;
     window_y = (monitor_height - window_height) / 2;
     window = CreateWindowExW(0, window_class.lpszClassName, L"Game Window", window_styles, window_x, window_y, window_width, window_height, 0, 0, instance, 0);
-    ASSERT(window != 0);
+    ASSERT(window != 0, L"Invalid main window handle - Window couldn't be created by Windows!");
     SetWindowLongW(window, GWL_STYLE, GetWindowLongW(window, GWL_STYLE) & ~(WS_MAXIMIZEBOX));
   }
   
@@ -145,42 +138,97 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
   {
     MSG window_msg = {0};
     GameBackBuffer game_back_buffer = {0};
-    float rect_x, rect_y;
-    LOCAL LARGE_INTEGER current_perf_counter = {0}, last_perf_counter = {0}, perf_frequency = {0};
+    GameInput game_input = {0};
+    LARGE_INTEGER current_perf_counter = {0}, last_perf_counter = {0}, perf_frequency = {0};
+    float dt; /* this is actually 'last_frame_dt' */
     
-    rect_x = rect_y = 0;
-    ASSERT(QueryPerformanceFrequency(&perf_frequency) != 0); /* this is the CPU ticks_per_second capability - TODO: maybe do some crazy shit if this fails */
-    ASSERT(QueryPerformanceCounter(&last_perf_counter) != 0);
+    ASSERT(QueryPerformanceFrequency(&perf_frequency) != 0, L"Couldn't get processor \'performance frequency\' - \'QueryPerformanceFrequency(...)\' shouldn't return 0!"); /* this is the CPU ticks_per_second capability - TODO: maybe do some crazy shit if this fails */
+    ASSERT(QueryPerformanceCounter(&last_perf_counter) != 0, L"Couldn't get processor \'performance counter\' - \'QueryPerformanceCounter(...)\' shouldn't return 0!");
+    dt = 0.0f;
     global_running = TRUE;
     while (global_running) {
-      /* Reset per frame input state */
-      {
-        move_up = move_down = move_left = move_right = FALSE;
-      }
       
+      /* NOTE: Input */
       while (PeekMessageW(&window_msg, 0, 0, 0, PM_REMOVE)) {
-        TranslateMessage(&window_msg);
-        DispatchMessageW(&window_msg);
+        switch (window_msg.message) {
+          case WM_KEYDOWN:
+          case WM_KEYUP:
+          case WM_SYSKEYDOWN:
+          case WM_SYSKEYUP: {
+            DWORD key;
+            S32 is_down, was_down, pressed, released;
+            
+            key = CAST(DWORD) window_msg.wParam;
+            was_down = ( (window_msg.lParam & (1 << 30)) != 0 ); /* NOTE: Yes, Douglas, if it's not zero, not necessarily it needs to be 1, it can be different than 1. */
+            is_down = ( (window_msg.lParam & (1 << 31)) == 0 );
+            pressed = is_down;
+            released = (was_down && !is_down) ? TRUE : FALSE;
+            
+            switch (key) {
+              case VK_RETURN: {
+                
+              } break;
+              
+              case VK_ESCAPE: {
+                
+              } break;
+              
+              case VK_UP:
+              case 'W': {
+                game_input.player1.up.pressed = pressed;
+                game_input.player1.up.released = released;
+              } break;
+              
+              case VK_DOWN:
+              case 'S': {
+                game_input.player1.down.pressed = pressed;
+                game_input.player1.down.released = released;
+              } break;
+              
+              case VK_LEFT:
+              case 'A': {
+                game_input.player1.left.pressed = pressed;
+                game_input.player1.left.released = released;
+              } break;
+              
+              case VK_RIGHT:
+              case 'D': {
+                game_input.player1.right.pressed = pressed;
+                game_input.player1.right.released = released;
+              } break;
+              
+              case VK_F4: {
+                B32 is_alt_pressed;
+                
+                is_alt_pressed = (window_msg.lParam & (1 << 29)) != 0;
+                if (is_alt_pressed) {
+                  global_running = FALSE;
+                };
+              } break;
+            }
+            
+          } break;
+          
+          default: {
+            TranslateMessage(&window_msg);
+            DispatchMessageW(&window_msg);
+          }
+        }
+        
       }
       
-      /* Update & Render */
+      /* NOTE: Update & Render */
       {
         LOCAL int release_dc_result;
         HDC window_dc;
-        LOCAL float rect_move_speed; /* 10 meters per second */
-        
-        rect_move_speed = 5000.0f * dt;
-        if (move_up)    { rect_y -= rect_move_speed; }
-        if (move_down)  { rect_y += rect_move_speed; }
-        if (move_left)  { rect_x -= rect_move_speed; }
-        if (move_right) { rect_x += rect_move_speed; }
         
         game_back_buffer.width = win32_back_buffer.width;
         game_back_buffer.height = win32_back_buffer.height;
         game_back_buffer.bytes_per_pixel = WIN32_BACK_BUFFER_BYTES_PER_PIXEL;
         game_back_buffer.stride = game_back_buffer.width * game_back_buffer.bytes_per_pixel;
         game_back_buffer.memory = win32_back_buffer.memory;
-        game_update_and_render(&game_back_buffer);
+        game_input.dt = dt;
+        game_update_and_render(&game_back_buffer, &game_input);
         
         window_dc = GetDC(window);
         /*ASSERT(window_dc != 0);*/
@@ -188,7 +236,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
         StretchDIBits(window_dc, 0, 0, WIN32_FRONT_BUFFER_WIDTH, WIN32_FRONT_BUFFER_HEIGHT, 0, 0, game_back_buffer.width, game_back_buffer.height, game_back_buffer.memory, &win32_back_buffer.bmp_info, DIB_RGB_COLORS, SRCCOPY);
         if (window_dc != 0) { /* This check exist's because when the window minimized this is 0 */
           release_dc_result = ReleaseDC(window, window_dc);
-          ASSERT(release_dc_result != 0);
+          ASSERT(release_dc_result != 0, L"Windows failed to release the main window device context!");
         }
         
         /* Timing */
@@ -197,7 +245,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
           LOCAL float elapsed_secs, elapsed_ms, elapsed_microsecs, elapsed_nanosecs = 0.0f;
           LOCAL int fps;
           
-          ASSERT(QueryPerformanceCounter(&current_perf_counter) != 0); /* TODO: Maybe do something smart here if it fails for some reason */
+          ASSERT(QueryPerformanceCounter(&current_perf_counter) != 0, L"Couldn't get processor \'performance counter\' - \'QueryPerformanceCounter(...)\' shouldn't return 0!"); /* TODO: Maybe do something smart here if it fails for some reason */
           
           perf_counter_diff.QuadPart = current_perf_counter.QuadPart - last_perf_counter.QuadPart; /* counts elapsed */
           elapsed_secs = CAST(float) perf_counter_diff.QuadPart / CAST(float) perf_frequency.QuadPart; /* counts per second */
@@ -206,7 +254,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
           elapsed_nanosecs    = elapsed_secs * 1000000000.0f;
           fps = CAST(int) (1.0f / elapsed_secs); /*CAST(int) (perf_frequency.QuadPart / perf_counter_diff.QuadPart);*/
           dt = 1.0f / fps; /* 'delta time' should be used when we want something to NOT BE frame rate dependent */
-          // NOTE: Debug 'time' print in the Visual Studio debugger
+          /* NOTE: Debug 'time' print in the Visual Studio debugger */
           {
             LOCAL int print_counter;
             wchar_t buffer[1024];

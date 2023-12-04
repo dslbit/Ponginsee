@@ -16,6 +16,8 @@
 #define ARRAY_COUNT(_x) (sizeof((_x)) / sizeof((_x[0]))) /* in number of elements */
 
 /* TODO: Types and later make it precise using compiler checks, c version checks and 'stdint.h' */
+typedef signed   int        B32;
+
 typedef unsigned char       U8;
 typedef unsigned short      U16;
 typedef unsigned int        U32;
@@ -35,6 +37,28 @@ struct GameBackBuffer {
   void *memory;
 };
 
-INTERNAL void game_update_and_render(GameBackBuffer *back_buffer);
+typedef struct GameButtonState GameButtonState;
+struct GameButtonState {
+  B32 pressed;
+  B32 released;
+};
+
+typedef struct GameControllerInput GameControllerInput;
+struct GameControllerInput {
+  GameButtonState start;
+  GameButtonState back; /* also used for menu (escape key) */
+  GameButtonState up;
+  GameButtonState down;
+  GameButtonState left;
+  GameButtonState right;
+};
+
+typedef struct GameInput GameInput;
+struct GameInput {
+  float dt;
+  GameControllerInput player1;
+};
+
+INTERNAL void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input);
 
 #endif /* PONG_PLATFORM_H */
