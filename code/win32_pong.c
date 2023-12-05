@@ -272,7 +272,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
           
           /* NOTE: CPU Sleep if too fast */
           {
-            LOCAL F32 desired_ms_per_frame = 16.0f; /* aprox. equivalent to 60 FPS - TODO: get the monitor refresh rate later */
+            LOCAL F32 desired_ms_per_frame = 16.666666f; /* 16.666 ~= 60 FPS, 33.333 ~= 30 FPS - TODO: get the monitor refresh rate later */
             LOCAL F32 elapsed_to_desired_ms_diff;
             
             ASSERT(QueryPerformanceCounter(&current_perf_counter) != 0, L"Couldn't get processor \'performance counter\' - \'QueryPerformanceCounter(...)\' shouldn't return 0!");
@@ -289,19 +289,20 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
                 ASSERT(QueryPerformanceCounter(&current_perf_counter) != 0, L"Couldn't get processor \'performance counter\' - \'QueryPerformanceCounter(...)\' shouldn't return 0!");
                 elapsed_ms = ((current_perf_counter.QuadPart - last_perf_counter.QuadPart) * 1000.0f) / (F32) perf_frequency.QuadPart;
               }
-              cooked_elapsed_ms = ((current_perf_counter.QuadPart - last_perf_counter.QuadPart) * 1000.0f) / perf_frequency.QuadPart;
-              /* NOTE: Debug 'time' print in the Visual Studio debugger */
-              {
-                LOCAL int print_counter = 1;
-                
-                ++print_counter;
-                if (print_counter > 10) {
-                  print_counter = 0;
-                  WIN32_DEBUG_PRINT(L"Raw MS: %fms\tCooked MS: %fms\n", raw_elapsed_ms, cooked_elapsed_ms);
-                }
+            }
+            cooked_elapsed_ms = ((current_perf_counter.QuadPart - last_perf_counter.QuadPart) * 1000.0f) / perf_frequency.QuadPart;
+            last_perf_counter = current_perf_counter; /* NOTE: This should be here, right after the while loop to reach target ms per frame */
+            
+            /* NOTE: Debug 'time' print in the Visual Studio debugger */
+            {
+              LOCAL int print_counter = 1;
+              
+              ++print_counter;
+              if (print_counter > 10) {
+                print_counter = 0;
+                WIN32_DEBUG_PRINT(L"Raw MS: %fms\tCooked MS: %fms\n", raw_elapsed_ms, cooked_elapsed_ms);
               }
             }
-            
           }
         }
         
@@ -315,9 +316,6 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
           ASSERT(release_dc_result != 0, L"Windows failed to release the main window device context!");
         }
       }
-      
-      ASSERT(QueryPerformanceCounter(&current_perf_counter) != 0, L"Couldn't get processor \'performance counter\' - \'QueryPerformanceCounter(...)\' shouldn't return 0!");
-      last_perf_counter = current_perf_counter;
     };
   }
   return 0;

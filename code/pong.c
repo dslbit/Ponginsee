@@ -39,7 +39,7 @@ INTERNAL void game_update_and_render(GameBackBuffer *back_buffer, GameInput *inp
   LOCAL float rect_x, rect_y;
   LOCAL float rect_move_speed;
   
-  rect_move_speed = 15000.0f * input->dt;
+  rect_move_speed = 7500.0f * input->dt;
   if (input->player1.up.pressed)    { rect_y -= rect_move_speed; }
   if (input->player1.down.pressed)  { rect_y += rect_move_speed; }
   if (input->player1.left.pressed)  { rect_x -= rect_move_speed; }
