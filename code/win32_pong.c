@@ -34,8 +34,10 @@ struct Win32BackBuffer {
   S32 height;
 };
 
+/* TODO: What about no global variables? */
 GLOBAL int global_running = FALSE;
 GLOBAL Win32BackBuffer win32_back_buffer;
+GLOBAL wchar_t path_to_exe_root[MAX_PATH];
 
 INTERNAL void WIN32_DEBUG_PRINT(wchar_t *msg, ...) {
   LOCAL wchar_t formated_msg[1024];
@@ -104,6 +106,25 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
   WNDCLASSEXW window_class = {0};
   HWND window;
   
+  /* Getting the executable file path */
+  {
+    int i, last_backslash_index;
+    wchar_t path[MAX_PATH] = {0};
+    
+    GetModuleFileNameW(0, path, ARRAY_COUNT(path));
+    last_backslash_index = 0;
+    for (i = 0; (i < ARRAY_COUNT(path)) && (path[i] != '\0'); ++i) {
+      if (path[i] == '\\') {
+        last_backslash_index = i;
+      }
+    }
+    ASSERT( ( ARRAY_COUNT(path_to_exe_root) == ARRAY_COUNT(path) ), L"Size of 'path_to_exe_root' should be the same as 'path'!");
+    for (i = 0; i < last_backslash_index; ++i) {
+      path_to_exe_root[i] = path[i];
+    }
+    path_to_exe_root[i] = '\0';
+  }
+  
   window_class.cbSize = sizeof(window_class);
   window_class.style = (CS_VREDRAW | CS_HREDRAW);
   window_class.hInstance = instance;
@@ -117,6 +138,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
     id_result = RegisterClassExW(&window_class);
     ASSERT(id_result != 0, L"Couldn't register the main window class for the game!");
   }
+  
   /* Window creation */
   {
     int window_x, window_y, window_width, window_height;
