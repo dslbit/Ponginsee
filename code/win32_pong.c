@@ -34,12 +34,19 @@ struct Win32BackBuffer {
   S32 height;
 };
 
+typedef struct Win32GameCode Win32GameCode;
+struct Win32GameCode {
+  HMODULE game_code_dll;
+  GameUpdateAndRenderFuncType *update_and_render;
+  B32 is_valid;
+};
+
 /* TODO: What about no global variables? */
 GLOBAL int global_running = FALSE;
 GLOBAL Win32BackBuffer win32_back_buffer;
-GLOBAL wchar_t path_to_exe_root[MAX_PATH];
+GLOBAL wchar_t global_path_to_exe_root[MAX_PATH];
 
-INTERNAL void WIN32_DEBUG_PRINT(wchar_t *msg, ...) {
+INTERNAL void win32_debug_print(wchar_t *msg, ...) {
   LOCAL wchar_t formated_msg[1024];
   va_list args;
   
@@ -47,6 +54,40 @@ INTERNAL void WIN32_DEBUG_PRINT(wchar_t *msg, ...) {
   vswprintf_s(formated_msg, ARRAY_COUNT(formated_msg), msg, args);
   va_end(args);
   OutputDebugStringW(formated_msg);
+}
+
+INTERNAL Win32GameCode win32_load_game_code(wchar_t *game_code_dll) {
+  Win32GameCode game_code = {0};
+  wchar_t game_code_dll_path[MAX_PATH] = {0};
+  
+  StringCbCopyW(game_code_dll_path, ARRAY_COUNT(game_code_dll_path), global_path_to_exe_root);
+  StringCbCatW(game_code_dll_path, ARRAY_COUNT(game_code_dll_path), L"\\");
+  StringCbCatW(game_code_dll_path, ARRAY_COUNT(game_code_dll_path), game_code_dll);
+  ASSERT(CopyFile(game_code_dll_path, L"pong_temp.dll", FALSE) != 0, L"Couldn't rename the game code dll using 'CopyFile(...)'!");
+  StringCbCopyW(game_code_dll_path, ARRAY_COUNT(game_code_dll_path), global_path_to_exe_root);
+  StringCbCatW(game_code_dll_path, ARRAY_COUNT(game_code_dll_path), L"\\pong_temp.dll");
+  game_code.game_code_dll = LoadLibraryW(game_code_dll_path);
+  if (game_code.game_code_dll != 0) {
+    game_code.update_and_render = CAST(GameUpdateAndRenderFuncType *) GetProcAddress(game_code.game_code_dll, "game_update_and_render");
+    game_code.is_valid = (game_code.update_and_render != 0);
+  }
+  
+  /* @IMPORTANT: Remember to add checks here for every function in the game layer that should be exported */
+  if (!game_code.is_valid) {
+    game_code.update_and_render = game_update_and_render_stub;
+  }
+  
+  return game_code;
+}
+
+INTERNAL void win32_unload_game_code(Win32GameCode *game_code) {
+  if (game_code->game_code_dll) {
+    FreeLibrary(game_code->game_code_dll);
+    game_code->game_code_dll = 0;
+  }
+  
+  game_code->is_valid = FALSE;
+  game_code->update_and_render = game_update_and_render_stub;
 }
 
 INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wparam, LPARAM lparam) {
@@ -111,18 +152,18 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
     int i, last_backslash_index;
     wchar_t path[MAX_PATH] = {0};
     
-    GetModuleFileNameW(0, path, ARRAY_COUNT(path));
+    ASSERT(GetModuleFileNameW(0, path, ARRAY_COUNT(path)) != 0, L"Couldn't ge the executable file path using 'GetModuleFileNameW(...)'!");
     last_backslash_index = 0;
     for (i = 0; (i < ARRAY_COUNT(path)) && (path[i] != '\0'); ++i) {
       if (path[i] == '\\') {
         last_backslash_index = i;
       }
     }
-    ASSERT( ( ARRAY_COUNT(path_to_exe_root) == ARRAY_COUNT(path) ), L"Size of 'path_to_exe_root' should be the same as 'path'!");
+    ASSERT( ( ARRAY_COUNT(global_path_to_exe_root) == ARRAY_COUNT(path) ), L"Size of 'global_path_to_exe_root' should be the same as 'path'!");
     for (i = 0; i < last_backslash_index; ++i) {
-      path_to_exe_root[i] = path[i];
+      global_path_to_exe_root[i] = path[i];
     }
-    path_to_exe_root[i] = '\0';
+    global_path_to_exe_root[i] = '\0';
   }
   
   window_class.cbSize = sizeof(window_class);
@@ -172,10 +213,14 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
     MSG window_msg = {0};
     GameBackBuffer game_back_buffer = {0};
     GameInput game_input = {0};
+    GameState game_state = {0};
+    Win32GameCode game_code = {0};
     LARGE_INTEGER current_perf_counter = {0}, last_perf_counter = {0}, perf_frequency = {0};
     U32 sleep_granularity;
     float raw_elapsed_ms, cooked_elapsed_ms;
     float dt; /* this is actually 'last_frame_dt' */
+    
+    game_code = win32_load_game_code(L"pong.dll");
     
     /* NOTE: Trying to apply high resolution Windows timers for precise sleeping */
     {
@@ -191,6 +236,20 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
     dt = 0.0f;
     global_running = TRUE;
     while (global_running) {
+      
+      /* Trying to load game code from dll every now and then (fake hot reload) */
+      {
+        LOCAL count;
+        
+        ++count;
+        if (count > 100) {
+          count = 0;
+          win32_unload_game_code(&game_code);
+          game_code = win32_load_game_code(L"pong.dll");
+        }
+      }
+      
+      
       
       /* NOTE: Input */
       while (PeekMessageW(&window_msg, 0, 0, 0, PM_REMOVE)) {
@@ -272,7 +331,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
         game_back_buffer.stride = game_back_buffer.width * game_back_buffer.bytes_per_pixel;
         game_back_buffer.memory = win32_back_buffer.memory;
         game_input.dt = dt;
-        game_update_and_render(&game_back_buffer, &game_input);
+        game_code.update_and_render(&game_back_buffer, &game_input, &game_state);
         
         /* NOTE: Timing */
         {
@@ -322,7 +381,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
               ++print_counter;
               if (print_counter > 10) {
                 print_counter = 0;
-                WIN32_DEBUG_PRINT(L"Raw MS: %fms\tCooked MS: %fms\n", raw_elapsed_ms, cooked_elapsed_ms);
+                win32_debug_print(L"Raw MS: %fms\tCooked MS: %fms\n", raw_elapsed_ms, cooked_elapsed_ms);
               }
             }
           }

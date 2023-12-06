@@ -1,7 +1,7 @@
 #include "pong_platform.h"
 
 /* TODO: Move to 'renderer' */
-INTERNAL void draw_pixel(GameBackBuffer *back_buffer, S32 x, S32 y, U32 color) {
+EXTERNIZE void draw_pixel(GameBackBuffer *back_buffer, S32 x, S32 y, U32 color) {
   U32 *pixel;
   
   if (x > back_buffer->width || x < 0) return;
@@ -11,9 +11,9 @@ INTERNAL void draw_pixel(GameBackBuffer *back_buffer, S32 x, S32 y, U32 color) {
 }
 
 /* TODO: Move to 'renderer' */
-INTERNAL void draw_rect(GameBackBuffer *back_buffer, S32 x, S32 y, S32 width, S32 height, U32 color) {
+EXTERNIZE void draw_rect(GameBackBuffer *back_buffer, S32 x, S32 y, S32 width, S32 height, U32 color) {
   S32 i, j;
-  LOCAL U32 *pixel;
+  U32 *pixel;
   
   width = (x + width); /* make width be end_x */
   if (width < 0) width = 0;
@@ -35,19 +35,18 @@ INTERNAL void draw_rect(GameBackBuffer *back_buffer, S32 x, S32 y, S32 width, S3
 }
 
 /* TODO: Platform-independent: game memory, sound output, file I/O */
-INTERNAL void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input) {
-  LOCAL float rect_x, rect_y;
-  LOCAL float rect_move_speed;
+EXTERNIZE GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
+  F32 rect_move_speed;
   
-  rect_move_speed = 7500.0f * input->dt;
-  if (input->player1.up.pressed)    { rect_y -= rect_move_speed; }
-  if (input->player1.down.pressed)  { rect_y += rect_move_speed; }
-  if (input->player1.left.pressed)  { rect_x -= rect_move_speed; }
-  if (input->player1.right.pressed) { rect_x += rect_move_speed; }
+  rect_move_speed = 2500.0f * input->dt;
+  if (input->player1.up.pressed)    { state->player_y -= rect_move_speed; }
+  if (input->player1.down.pressed)  { state->player_y += rect_move_speed; }
+  if (input->player1.left.pressed)  { state->player_x -= rect_move_speed; }
+  if (input->player1.right.pressed) { state->player_x += rect_move_speed; }
   
   /* Dirty clear background before drawing, TODO: a proper 'draw_background' */
   draw_rect(back_buffer, 0, 0, back_buffer->width, back_buffer->height, 0x00000000);
   
   /* Player (rect) representation */
-  draw_rect(back_buffer, 50 + CAST(int) rect_x, 50 + CAST(int) rect_y, 80, 45, 0xFFFF0000);
+  draw_rect(back_buffer, 50 + CAST(int) state->player_x, 50 + CAST(int) state->player_y, 80, 45, 0xFF0000FF);
 }

@@ -17,6 +17,12 @@
 
 #define MIN(_x, _y) ((_x) < (_y) ? (_x) : (_y))
 
+#if defined(__cplusplus)
+#define EXTERNIZE extern "C"
+#else
+#define EXTERNIZE
+#endif
+
 /* TODO: Types and later make it precise using compiler checks, c version checks and 'stdint.h' */
 typedef signed   int        B32;
 
@@ -64,6 +70,22 @@ struct GameInput {
   GameControllerInput player1;
 };
 
-INTERNAL void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input);
+typedef struct GameState GameState;
+struct GameState {
+  F32 player_x;
+  F32 player_y;
+};
+
+#define GAME_UPDATE_AND_RENDER_PROTOTYPE(_name) void _name(GameBackBuffer *back_buffer, GameInput *input, GameState *state)
+typedef GAME_UPDATE_AND_RENDER_PROTOTYPE(GameUpdateAndRenderFuncType);
+GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render_stub)
+{
+  
+}
+
+EXTERNIZE GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render);
+
+
+
 
 #endif /* PONG_PLATFORM_H */
