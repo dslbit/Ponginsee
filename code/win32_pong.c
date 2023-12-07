@@ -205,6 +205,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
     DWORD window_styles;
     RECT rect = {0};
     
+    /* @IMPORTANT: Will this work on a multi-monitor setup? Wouldn't be better to use GetDeviceCaps(...)? */
     rect.left = 0;
     rect.right = WIN32_FRONT_BUFFER_WIDTH;
     rect.top = 0;
@@ -237,6 +238,15 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
     float raw_elapsed_ms, cooked_elapsed_ms;
     float dt; /* this is actually 'last_frame_dt' */
     wchar_t game_dll_full_path[MAX_PATH] = {0}, game_temp_dll_full_path[MAX_PATH] = {0}, lock_pdb_full_path[MAX_PATH] = {0};
+    S32 monitor_refresh_rate;
+    
+    /* Get the monitor refresh rate */
+    {
+      HDC window_dc;
+      
+      window_dc = GetDC(window);
+      monitor_refresh_rate = GetDeviceCaps(window_dc, VREFRESH);
+    }
     
     win32_build_root_path_for_file(game_dll_full_path, ARRAY_COUNT(game_dll_full_path), L"pong.dll");
     win32_build_root_path_for_file(game_temp_dll_full_path, ARRAY_COUNT(game_temp_dll_full_path), L"pong_temp.dll");
@@ -380,9 +390,10 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
           
           /* NOTE: CPU Sleep if too fast */
           {
-            LOCAL F32 desired_ms_per_frame = 16.666666f; /* 16.666 ~= 60 FPS, 33.333 ~= 30 FPS - TODO: get the monitor refresh rate later */
+            LOCAL F32 desired_ms_per_frame; /* 16.666 ~= 60 FPS, 33.333 ~= 30 FPS */
             LOCAL F32 elapsed_to_desired_ms_diff;
             
+            desired_ms_per_frame = 1000.0f / CAST(F32) monitor_refresh_rate; /* @CLEANUP: no need to calc every frame */
             ASSERT(QueryPerformanceCounter(&current_perf_counter) != 0, L"Couldn't get processor \'performance counter\' - \'QueryPerformanceCounter(...)\' shouldn't return 0!");
             elapsed_ms = ((current_perf_counter.QuadPart - last_perf_counter.QuadPart) * 1000.0f) / (F32) perf_frequency.QuadPart;
             elapsed_to_desired_ms_diff = (desired_ms_per_frame - elapsed_ms);
