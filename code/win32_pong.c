@@ -36,7 +36,8 @@ struct Win32BackBuffer {
 
 typedef struct Win32GameCode Win32GameCode;
 struct Win32GameCode {
-  HMODULE game_code_dll;
+  HMODULE dll;
+  FILETIME dll_last_write_time;
   GameUpdateAndRenderFuncType *update_and_render;
   B32 is_valid;
 };
@@ -56,34 +57,50 @@ INTERNAL void win32_debug_print(wchar_t *msg, ...) {
   OutputDebugStringW(formated_msg);
 }
 
-INTERNAL Win32GameCode win32_load_game_code(wchar_t *game_code_dll) {
+INTERNAL void win32_build_root_path_for_file(wchar_t *full_path, S32 full_path_length, wchar_t *file_name) {
+  StringCbCopyW(full_path, full_path_length, global_path_to_exe_root);
+  StringCbCatW(full_path, full_path_length, L"\\");
+  StringCbCatW(full_path, full_path_length, file_name);
+}
+
+INTERNAL Win32GameCode win32_load_game_code(wchar_t *dll_full_path, wchar_t *temp_dll_full_path, wchar_t *lock_pdb_full_path) {
   Win32GameCode game_code = {0};
-  wchar_t game_code_dll_path[MAX_PATH] = {0};
+  WIN32_FILE_ATTRIBUTE_DATA ignored = {0};
   
-  StringCbCopyW(game_code_dll_path, ARRAY_COUNT(game_code_dll_path), global_path_to_exe_root);
-  StringCbCatW(game_code_dll_path, ARRAY_COUNT(game_code_dll_path), L"\\");
-  StringCbCatW(game_code_dll_path, ARRAY_COUNT(game_code_dll_path), game_code_dll);
-  ASSERT(CopyFile(game_code_dll_path, L"pong_temp.dll", FALSE) != 0, L"Couldn't rename the game code dll using 'CopyFile(...)'!");
-  StringCbCopyW(game_code_dll_path, ARRAY_COUNT(game_code_dll_path), global_path_to_exe_root);
-  StringCbCatW(game_code_dll_path, ARRAY_COUNT(game_code_dll_path), L"\\pong_temp.dll");
-  game_code.game_code_dll = LoadLibraryW(game_code_dll_path);
-  if (game_code.game_code_dll != 0) {
-    game_code.update_and_render = CAST(GameUpdateAndRenderFuncType *) GetProcAddress(game_code.game_code_dll, "game_update_and_render");
-    game_code.is_valid = (game_code.update_and_render != 0);
-  }
-  
-  /* @IMPORTANT: Remember to add checks here for every function in the game layer that should be exported */
-  if (!game_code.is_valid) {
-    game_code.update_and_render = game_update_and_render_stub;
+  if (!GetFileAttributesExW(lock_pdb_full_path, GetFileExInfoStandard, &ignored)) { /* NOTE: Only load if 'lock.tmp' is deleted - that is, after the pdb is unlock by the VS debugger */
+    /* Getting the dll last written time */
+    {
+      WIN32_FILE_ATTRIBUTE_DATA dll_attributes = {0};
+      
+      ASSERT(GetFileAttributesExW(dll_full_path, GetFileExInfoStandard, &dll_attributes) != 0, L"Couldn't get the game dll file attributes!");
+      game_code.dll_last_write_time = dll_attributes.ftLastWriteTime;
+    }
+    
+    /* NOTE: This for loop is necessary because, for some unknown reason, CopyFile can fail on its own */
+    for (;;) {
+      if (CopyFile(dll_full_path, temp_dll_full_path, FALSE) != 0) break;
+      if (GetLastError() == ERROR_FILE_NOT_FOUND) break;
+    }
+    game_code.dll = LoadLibraryW(temp_dll_full_path);
+    if (game_code.dll != 0) {
+      game_code.update_and_render = CAST(GameUpdateAndRenderFuncType *) GetProcAddress(game_code.dll, "game_update_and_render");
+      game_code.is_valid = (game_code.update_and_render != 0);
+    }
+    
+    /* @IMPORTANT: Remember to add checks here for every function in the game layer that should be exported */
+    if (!game_code.is_valid) {
+      game_code.update_and_render = game_update_and_render_stub;
+    }
   }
   
   return game_code;
 }
 
 INTERNAL void win32_unload_game_code(Win32GameCode *game_code) {
-  if (game_code->game_code_dll) {
-    FreeLibrary(game_code->game_code_dll);
-    game_code->game_code_dll = 0;
+  if (game_code->dll) {
+    /* NOTE: For now, I'll unload the library, but what if it is still pointing to a string inside them? - Maybe also rename the dll with an index, keep track of it, and load the latest dll index and never unload the library, ever. */
+    FreeLibrary(game_code->dll);
+    game_code->dll = 0;
   }
   
   game_code->is_valid = FALSE;
@@ -219,8 +236,13 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
     U32 sleep_granularity;
     float raw_elapsed_ms, cooked_elapsed_ms;
     float dt; /* this is actually 'last_frame_dt' */
+    wchar_t game_dll_full_path[MAX_PATH] = {0}, game_temp_dll_full_path[MAX_PATH] = {0}, lock_pdb_full_path[MAX_PATH] = {0};
     
-    game_code = win32_load_game_code(L"pong.dll");
+    win32_build_root_path_for_file(game_dll_full_path, ARRAY_COUNT(game_dll_full_path), L"pong.dll");
+    win32_build_root_path_for_file(game_temp_dll_full_path, ARRAY_COUNT(game_temp_dll_full_path), L"pong_temp.dll");
+    win32_build_root_path_for_file(lock_pdb_full_path, ARRAY_COUNT(lock_pdb_full_path), L"lock.tmp");
+    
+    game_code = win32_load_game_code(game_dll_full_path, game_temp_dll_full_path, lock_pdb_full_path);
     
     /* NOTE: Trying to apply high resolution Windows timers for precise sleeping */
     {
@@ -236,20 +258,25 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
     dt = 0.0f;
     global_running = TRUE;
     while (global_running) {
-      
-      /* Trying to load game code from dll every now and then (fake hot reload) */
+      /* NOTE: Reload game code, if necessary */
       {
-        LOCAL count;
+#if defined(WIN32_DEBUG)
+        FILETIME current_dll_file_time = {0};
+        WIN32_FILE_ATTRIBUTE_DATA dll_attributes = {0};
         
-        ++count;
-        if (count > 100) {
-          count = 0;
+        ASSERT(GetFileAttributesExW(game_dll_full_path, GetFileExInfoStandard, &dll_attributes) != 0, L"Couldn't get the game dll file attributes!");
+        current_dll_file_time = dll_attributes.ftLastWriteTime;
+        if (CompareFileTime(&current_dll_file_time, &game_code.dll_last_write_time) != 0) {
+          U32 load_try_index;
+          
           win32_unload_game_code(&game_code);
-          game_code = win32_load_game_code(L"pong.dll");
+          for (load_try_index = 0; (!game_code.is_valid) && (load_try_index < 100); ++load_try_index) {
+            game_code = win32_load_game_code(game_dll_full_path, game_temp_dll_full_path, lock_pdb_full_path);
+            Sleep(100);
+          }
         }
+#endif
       }
-      
-      
       
       /* NOTE: Input */
       while (PeekMessageW(&window_msg, 0, 0, 0, PM_REMOVE)) {

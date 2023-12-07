@@ -48,5 +48,5 @@ EXTERNIZE GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
   draw_rect(back_buffer, 0, 0, back_buffer->width, back_buffer->height, 0x00000000);
   
   /* Player (rect) representation */
-  draw_rect(back_buffer, 50 + CAST(int) state->player_x, 50 + CAST(int) state->player_y, 80, 45, 0xFF0000FF);
+  draw_rect(back_buffer, 50 + CAST(int) state->player_x, 50 + CAST(int) state->player_y, 80, 45, 0xFFF1F1F1);
 }
