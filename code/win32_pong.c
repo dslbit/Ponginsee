@@ -112,6 +112,14 @@ INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wp
   
   result = 0;
   switch(msg) {
+    case WM_ACTIVATEAPP: {
+      if (wparam == TRUE) { /* if window is in focus, full alpha ON*/
+        SetLayeredWindowAttributes(window, RGB(0, 0, 0), 255, LWA_ALPHA);
+      } else {
+        SetLayeredWindowAttributes(window, RGB(0, 0, 0), 68, LWA_ALPHA);
+      }
+    } break;
+    
     case WM_SIZE: {
       DWORD size_msg;
       size_t back_buffer_mem_size;
@@ -221,7 +229,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
     ASSERT(monitor_height != 0, L"Couldn't get \'monitor_height\' using \'GetSystemMetrics(...)\'!");
     window_x = (monitor_width - window_width) / 2;
     window_y = (monitor_height - window_height) / 2;
-    window = CreateWindowExW(0, window_class.lpszClassName, L"Game Window", window_styles, window_x, window_y, window_width, window_height, 0, 0, instance, 0);
+    window = CreateWindowExW((WS_EX_TOPMOST | WS_EX_LAYERED), window_class.lpszClassName, L"Game Window", window_styles, window_x, window_y, window_width, window_height, 0, 0, instance, 0);
     ASSERT(window != 0, L"Invalid main window handle - Window couldn't be created by Windows!");
     SetWindowLongW(window, GWL_STYLE, GetWindowLongW(window, GWL_STYLE) & ~(WS_MAXIMIZEBOX));
   }
