@@ -10,24 +10,39 @@ EXTERNIZE void draw_pixel(GameBackBuffer *back_buffer, S32 x, S32 y, U32 color) 
   *pixel = color; /* AARRGGBB */
 }
 
+INTERNAL S32 round_f32_to_s32(F32 value) {
+  S32 result;
+  
+  result = CAST(S32) (value + 0.5f);
+  return result;
+}
+
 /* TODO: Move to 'renderer' */
-EXTERNIZE void draw_rect(GameBackBuffer *back_buffer, S32 x, S32 y, S32 width, S32 height, U32 color) {
+EXTERNIZE void draw_rect(GameBackBuffer *back_buffer, F32 x, F32 y, F32 width, F32 height, U32 color) {
   S32 i, j;
+  S32 start_x, start_y, end_x, end_y;
   U32 *pixel;
   
-  width = (x + width); /* make width be end_x */
-  if (width < 0) width = 0;
-  if (width > back_buffer->width) width = back_buffer->width;
-  height = (y + height); /* make height be end_y */
-  if (height < 0) height = 0;
-  if (height > back_buffer->height) height = back_buffer->height;
-  if (x < 0) x = 0;
-  if (x >  back_buffer->width) x = back_buffer->width;
-  if (y < 0) y = 0;
-  if (y > back_buffer->height) y = back_buffer->height;
-  for (i = y; i < height; ++i) {
-    pixel = CAST(U32 *) ((CAST(U8 *) back_buffer->memory) + (i * back_buffer->stride) + (x * back_buffer->bytes_per_pixel));
-    for (j = x; j < width; ++j) {
+  /* round to int */
+  start_x = round_f32_to_s32(x);
+  start_y = round_f32_to_s32(y);
+  end_x   = round_f32_to_s32(x + width);
+  end_y   = round_f32_to_s32(y + height);
+  
+  /* clip to buffer */
+  if (start_x < 0) start_x = 0;
+  if (start_x >  back_buffer->width) start_x = back_buffer->width;
+  if (start_y < 0) start_y = 0;
+  if (start_y > back_buffer->height) start_y = back_buffer->height;
+  if (end_x < 0) end_x = 0;
+  if (end_x > back_buffer->width) end_x = back_buffer->width;
+  if (end_y < 0) end_y = 0;
+  if (end_y > back_buffer->height) end_y = back_buffer->height;
+  
+  /* start drawing */
+  for (i = start_y; i < end_y; ++i) {
+    pixel = CAST(U32 *) ((CAST(U8 *) back_buffer->memory) + (i * back_buffer->stride) + (start_x * back_buffer->bytes_per_pixel));
+    for (j = start_x; j < end_x; ++j) {
       *pixel = color;
       pixel++;
     }
@@ -45,8 +60,8 @@ EXTERNIZE GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
   if (input->player1.right.pressed) { state->player_x += rect_move_speed; }
   
   /* Dirty clear background before drawing, TODO: a proper 'draw_background' */
-  draw_rect(back_buffer, 0, 0, back_buffer->width, back_buffer->height, 0x00000000);
+  draw_rect(back_buffer, 0.0f, 0.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, 0x00FF00FF);
   
   /* Player (rect) representation */
-  draw_rect(back_buffer, 50 + CAST(int) state->player_x, 50 + CAST(int) state->player_y, 80, 45, 0xFFF1F1F1);
+  draw_rect(back_buffer, 50 + state->player_x, 50 + state->player_y, 80, 45, 0xFFF1F1F1);
 }
