@@ -253,7 +253,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
       HDC window_dc;
       
       window_dc = GetDC(window);
-      monitor_refresh_rate = GetDeviceCaps(window_dc, VREFRESH);
+      monitor_refresh_rate = GetDeviceCaps(window_dc, VREFRESH); /* NOTE: User's primary monitor */
+      ASSERT((monitor_refresh_rate >= 30), L"Your primary monitor is less than 30Hz, you wouldn't be able to experience the game well, so the application will be closed!"); // TODO: Proper exit
     }
     
     win32_build_root_path_for_file(game_dll_full_path, ARRAY_COUNT(game_dll_full_path), L"pong.dll");
