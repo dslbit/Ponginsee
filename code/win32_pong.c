@@ -241,7 +241,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
     window_y = (monitor_height - window_height) / 2;
     window = CreateWindowExW((WS_EX_TOPMOST | WS_EX_LAYERED), window_class.lpszClassName, L"Game Window", window_styles, window_x, window_y, window_width, window_height, 0, 0, instance, 0);
     ASSERT(window != 0, L"Invalid main window handle - Window couldn't be created by Windows!");
-    SetWindowLongW(window, GWL_STYLE, GetWindowLongW(window, GWL_STYLE) & ~(WS_MAXIMIZEBOX));
+    SetWindowLongW(window, GWL_STYLE, GetWindowLongW(window, GWL_STYLE) & ~(WS_MAXIMIZEBOX | WS_SIZEBOX));
   }
   
   /* Game window message loop */
