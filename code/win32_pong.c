@@ -46,6 +46,7 @@ struct Win32GameCode {
 GLOBAL int global_running = FALSE;
 GLOBAL Win32BackBuffer win32_back_buffer;
 GLOBAL wchar_t global_path_to_exe_root[MAX_PATH];
+GLOBAL S32 global_show_cursor;
 
 INTERNAL void win32_debug_print(wchar_t *msg, ...) {
   LOCAL wchar_t formated_msg[1024];
@@ -118,6 +119,15 @@ INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wp
       } else {
         SetLayeredWindowAttributes(window, RGB(0, 0, 0), 68, LWA_ALPHA);
       }
+    } break;
+    
+    case WM_SETCURSOR: {
+      if (global_show_cursor) {
+        SetCursor(LoadCursor(0, IDC_ARROW));
+      } else {
+        SetCursor(0);
+      }
+      
     } break;
     
     case WM_SIZE: {
