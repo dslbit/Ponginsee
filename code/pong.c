@@ -64,7 +64,7 @@ EXTERNIZE void draw_rect(GameBackBuffer *back_buffer, F32 x, F32 y, F32 width, F
 EXTERNIZE GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
   F32 rect_move_speed;
   
-  rect_move_speed = 2500.0f * input->dt;
+  rect_move_speed = 100.0f * input->dt;
   if (input->player1.up.pressed)    { state->player_y -= rect_move_speed; }
   if (input->player1.down.pressed)  { state->player_y += rect_move_speed; }
   if (input->player1.left.pressed)  { state->player_x -= rect_move_speed; }
@@ -74,5 +74,5 @@ EXTERNIZE GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
   draw_rect(back_buffer, 0.0f, 0.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, 1.0f, 0.0f, 1.0f);
   
   /* Player (rect) representation */
-  draw_rect(back_buffer, 50 + state->player_x, 50 + state->player_y, 80, 45, 0.364705f, 0.464705f, 0.964705f);
+  draw_rect(back_buffer, 50 + state->player_x, 50 + state->player_y, 15, 15, 0.364705f, 0.464705f, 0.964705f);
 }

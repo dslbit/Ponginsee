@@ -264,7 +264,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
     LARGE_INTEGER current_perf_counter = {0}, last_perf_counter = {0}, perf_frequency = {0};
     U32 sleep_granularity;
     float raw_elapsed_ms, cooked_elapsed_ms;
-    float dt; /* this is actually 'last_frame_dt' */
+    float dt; /* this is actually 'last_frame_dt', in seconds */
     wchar_t game_dll_full_path[MAX_PATH] = {0}, game_temp_dll_full_path[MAX_PATH] = {0}, lock_pdb_full_path[MAX_PATH] = {0};
     S32 monitor_refresh_rate;
     
@@ -441,6 +441,50 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
         game_input.dt = dt;
         game_code.update_and_render(&game_back_buffer, &game_input, &game_state);
         
+        /* Display the 'back_buffer' in window */
+        {
+          S32 front_buffer_width, front_buffer_height;
+          S32 front_buffer_xoffset, front_buffer_yoffset;
+          
+          front_buffer_width = WIN32_FRONT_BUFFER_WIDTH;
+          front_buffer_height = WIN32_FRONT_BUFFER_HEIGHT;
+          front_buffer_xoffset = front_buffer_yoffset = 0;
+          /* TODO: Store this only once, when user toggle fullscreen, in 'win32_state' */
+          if (global_is_fullscreen) {
+            int i;
+            S32 monitor_max_width, monitor_max_height;
+            MONITORINFO monitor_info = {0};
+            /* NOTE: 16:9 resolutions divisible by 8 */
+            LOCAL S32 front_buffer_dimensions[][2] = { { 128,  72 }, { 256,  144 }, { 384,  216 }, { 512,  288 }, { 640,  360 }, { 768,  432 }, { 896,  504 }, { 1024, 576 }, { 1152, 648 }, { 1280, 720 }, { 1408, 792 }, { 1536, 864 }, { 1664, 936 }, { 1792, 1008 }, { 1920, 1080 }, { 2048, 1152 }, { 2176, 1224 }, { 2304, 1296 }, { 2432, 1368 }, { 2560, 1440 }, { 2688, 1512 }, { 2816, 1584 }, { 2944, 1656 }, { 3072, 1728 }, { 3200, 1800 }, { 3328, 1872 }, { 3456, 1944 }, { 3584, 2016 }, { 3712, 2088 }, { 3840, 2160 }, { 3968, 2232 }, { 4096, 2304 }, { 4224, 2376 }, { 4352, 2448 }, { 4480, 2520 }, { 4608, 2592 }, { 4736, 2664 }, { 4864, 2736 }, { 4992, 2808 }, { 5120, 2880 }, { 5248, 2952 }, { 5376, 3024 }, { 5504, 3096 }, { 5632, 3168 }, { 5760, 3240 }, { 5888, 3312 }, { 6016, 3384 }, { 6144, 3456 }, { 6272, 3528 }, { 6400, 3600 }, { 6528, 3672 }, { 6656, 3744 }, { 6784, 3816 }, { 6912, 3888 }, { 7040, 3960 }, { 7168, 4032 }, { 7296, 4104 }, { 7424, 4176 }, { 7552, 4248 }, { 7680, 4320 } }; /* up to 8k */
+            
+            monitor_info.cbSize = sizeof(monitor_info);
+            GetMonitorInfoW(MonitorFromWindow(window, MONITOR_DEFAULTTOPRIMARY), &monitor_info);
+            monitor_max_width = monitor_info.rcMonitor.right - monitor_info.rcMonitor.left;
+            monitor_max_height = monitor_info.rcMonitor.bottom - monitor_info.rcMonitor.top;
+            front_buffer_width = WIN32_BACK_BUFFER_WIDTH;
+            front_buffer_height = WIN32_BACK_BUFFER_HEIGHT;
+            for(i = 0; i < ARRAY_COUNT(front_buffer_dimensions); ++i) {
+              if (front_buffer_dimensions[i][0] > monitor_max_width) break;
+              if (front_buffer_dimensions[i][1] > monitor_max_height) break;
+              front_buffer_width = front_buffer_dimensions[i][0];
+              front_buffer_height = front_buffer_dimensions[i][1];
+            }
+            /* win32_debug_print(L"front_buffer width: %d, front_buffer height: %d \n", front_buffer_width, front_buffer_height);*/
+            front_buffer_xoffset = (monitor_max_width - front_buffer_width) / 2;
+            front_buffer_yoffset = (monitor_max_height - front_buffer_height) / 2;
+            /* NOTE: Should I 'PatBlit(...)' the not-drawn regions? */
+          }
+          
+          window_dc = GetDC(window); /* NOTE: Maybe this isn't necessary at all, since I'll do the rendering myself, I don't really need to release the DC everyframe. */
+          /*ASSERT(window_dc != 0);*/
+          /* NOTE: BitBlt is faster than SctretchDIBits, maybe, in the future, change to BitBlt and do a bitmap resize by hand for the 'front buffer'? */
+          StretchDIBits(window_dc, front_buffer_xoffset, front_buffer_yoffset, front_buffer_width, front_buffer_height, 0, 0, game_back_buffer.width, game_back_buffer.height, game_back_buffer.memory, &win32_back_buffer.bmp_info, DIB_RGB_COLORS, SRCCOPY);
+          if (window_dc != 0) { /* This check exist's because when the window minimized this is 0 */
+            release_dc_result = ReleaseDC(window, window_dc);
+            ASSERT(release_dc_result != 0, L"Windows failed to release the main window device context!");
+          }
+        }
+        
         /* NOTE: Timing */
         {
           LOCAL LARGE_INTEGER perf_counter_diff = {0};
@@ -495,52 +539,6 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
             }
           }
         }
-        
-        /* Display the 'back_buffer' in window */
-        {
-          S32 front_buffer_width, front_buffer_height;
-          S32 front_buffer_xoffset, front_buffer_yoffset;
-          
-          front_buffer_width = WIN32_FRONT_BUFFER_WIDTH;
-          front_buffer_height = WIN32_FRONT_BUFFER_HEIGHT;
-          front_buffer_xoffset = front_buffer_yoffset = 0;
-          /* TODO: Store this only once, when user toggle fullscreen, in 'win32_state' */
-          if (global_is_fullscreen) {
-            int i;
-            S32 monitor_max_width, monitor_max_height;
-            MONITORINFO monitor_info = {0};
-            /* NOTE: 16:9 resolutions divisible by 8 */
-            LOCAL S32 front_buffer_dimensions[][2] = { { 128,  72 }, { 256,  144 }, { 384,  216 }, { 512,  288 }, { 640,  360 }, { 768,  432 }, { 896,  504 }, { 1024, 576 }, { 1152, 648 }, { 1280, 720 }, { 1408, 792 }, { 1536, 864 }, { 1664, 936 }, { 1792, 1008 }, { 1920, 1080 }, { 2048, 1152 }, { 2176, 1224 }, { 2304, 1296 }, { 2432, 1368 }, { 2560, 1440 }, { 2688, 1512 }, { 2816, 1584 }, { 2944, 1656 }, { 3072, 1728 }, { 3200, 1800 }, { 3328, 1872 }, { 3456, 1944 }, { 3584, 2016 }, { 3712, 2088 }, { 3840, 2160 }, { 3968, 2232 }, { 4096, 2304 }, { 4224, 2376 }, { 4352, 2448 }, { 4480, 2520 }, { 4608, 2592 }, { 4736, 2664 }, { 4864, 2736 }, { 4992, 2808 }, { 5120, 2880 }, { 5248, 2952 }, { 5376, 3024 }, { 5504, 3096 }, { 5632, 3168 }, { 5760, 3240 }, { 5888, 3312 }, { 6016, 3384 }, { 6144, 3456 }, { 6272, 3528 }, { 6400, 3600 }, { 6528, 3672 }, { 6656, 3744 }, { 6784, 3816 }, { 6912, 3888 }, { 7040, 3960 }, { 7168, 4032 }, { 7296, 4104 }, { 7424, 4176 }, { 7552, 4248 }, { 7680, 4320 } }; /* up to 8k */
-            
-            monitor_info.cbSize = sizeof(monitor_info);
-            GetMonitorInfoW(MonitorFromWindow(window, MONITOR_DEFAULTTOPRIMARY), &monitor_info);
-            monitor_max_width = monitor_info.rcMonitor.right - monitor_info.rcMonitor.left;
-            monitor_max_height = monitor_info.rcMonitor.bottom - monitor_info.rcMonitor.top;
-            front_buffer_width = WIN32_BACK_BUFFER_WIDTH;
-            front_buffer_height = WIN32_BACK_BUFFER_HEIGHT;
-            for(i = 0; i < ARRAY_COUNT(front_buffer_dimensions); ++i) {
-              if (front_buffer_dimensions[i][0] > monitor_max_width) break;
-              if (front_buffer_dimensions[i][1] > monitor_max_height) break;
-              front_buffer_width = front_buffer_dimensions[i][0];
-              front_buffer_height = front_buffer_dimensions[i][1];
-            }
-            /* win32_debug_print(L"front_buffer width: %d, front_buffer height: %d \n", front_buffer_width, front_buffer_height);*/
-            front_buffer_xoffset = (monitor_max_width - front_buffer_width) / 2;
-            front_buffer_yoffset = (monitor_max_height - front_buffer_height) / 2;
-            /* NOTE: Should I 'PatBlit(...)' the not-drawn regions? */
-          }
-          
-          window_dc = GetDC(window); /* NOTE: Maybe this isn't necessary at all, since I'll do the rendering myself, I don't really need to release the DC everyframe. */
-          /*ASSERT(window_dc != 0);*/
-          /* NOTE: BitBlt is faster than SctretchDIBits, maybe, in the future, change to BitBlt and do a bitmap resize by hand for the 'front buffer'? */
-          StretchDIBits(window_dc, front_buffer_xoffset, front_buffer_yoffset, front_buffer_width, front_buffer_height, 0, 0, game_back_buffer.width, game_back_buffer.height, game_back_buffer.memory, &win32_back_buffer.bmp_info, DIB_RGB_COLORS, SRCCOPY);
-          if (window_dc != 0) { /* This check exist's because when the window minimized this is 0 */
-            release_dc_result = ReleaseDC(window, window_dc);
-            ASSERT(release_dc_result != 0, L"Windows failed to release the main window device context!");
-          }
-        }
-        
-        
       }
     }
   }
