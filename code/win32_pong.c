@@ -47,6 +47,8 @@ GLOBAL int global_running = FALSE;
 GLOBAL Win32BackBuffer win32_back_buffer;
 GLOBAL wchar_t global_path_to_exe_root[MAX_PATH];
 GLOBAL S32 global_show_cursor;
+GLOBAL B32 global_is_window_topmost;
+GLOBAL B32 global_is_fullscreen;
 
 INTERNAL void win32_debug_print(wchar_t *msg, ...) {
   LOCAL wchar_t formated_msg[1024];
@@ -114,10 +116,12 @@ INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wp
   result = 0;
   switch(msg) {
     case WM_ACTIVATEAPP: {
-      if (wparam == TRUE) { /* if window is in focus, full alpha ON*/
-        SetLayeredWindowAttributes(window, RGB(0, 0, 0), 255, LWA_ALPHA);
-      } else {
-        SetLayeredWindowAttributes(window, RGB(0, 0, 0), 68, LWA_ALPHA);
+      if (global_is_window_topmost) {
+        if (wparam == TRUE) { /* if window is in focus, full alpha ON*/
+          SetLayeredWindowAttributes(window, RGB(0, 0, 0), 255, LWA_ALPHA);
+        } else {
+          SetLayeredWindowAttributes(window, RGB(0, 0, 0), 68, LWA_ALPHA);
+        }
       }
     } break;
     
@@ -204,7 +208,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
   window_class.cbSize = sizeof(window_class);
   window_class.style = (CS_VREDRAW | CS_HREDRAW);
   window_class.hInstance = instance;
-  window_class.hbrBackground = CreateSolidBrush(RGB(255, 0, 255));
+  /* window_class.hbrBackground = CreateSolidBrush(RGB(255, 0, 255)); */
+  //window_class.hbrBackground = CreateSolidBrush(RGB(0, 0, 0));
   window_class.lpszClassName = L"Game Window Class";
   window_class.lpfnWndProc = win32_window_callback;
   /* Window class validation */
@@ -239,7 +244,12 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
     ASSERT(monitor_height != 0, L"Couldn't get \'monitor_height\' using \'GetSystemMetrics(...)\'!");
     window_x = (monitor_width - window_width) / 2;
     window_y = (monitor_height - window_height) / 2;
-    window = CreateWindowExW((WS_EX_TOPMOST | WS_EX_LAYERED), window_class.lpszClassName, L"Game Window", window_styles, window_x, window_y, window_width, window_height, 0, 0, instance, 0);
+    global_is_window_topmost = FALSE;
+    if (global_is_window_topmost) {
+      window = CreateWindowExW((WS_EX_TOPMOST | WS_EX_LAYERED), window_class.lpszClassName, L"Game Window", window_styles, window_x, window_y, window_width, window_height, 0, 0, instance, 0);
+    } else {
+      window = CreateWindowExW(0, window_class.lpszClassName, L"Game Window", window_styles, window_x, window_y, window_width, window_height, 0, 0, instance, 0);
+    }
     ASSERT(window != 0, L"Invalid main window handle - Window couldn't be created by Windows!");
     SetWindowLongW(window, GWL_STYLE, GetWindowLongW(window, GWL_STYLE) & ~(WS_MAXIMIZEBOX | WS_SIZEBOX));
   }
@@ -264,7 +274,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
       
       window_dc = GetDC(window);
       monitor_refresh_rate = GetDeviceCaps(window_dc, VREFRESH); /* NOTE: User's primary monitor */
-      ASSERT((monitor_refresh_rate >= 30), L"Your primary monitor is less than 30Hz, you wouldn't be able to experience the game well, so the application will be closed!"); // TODO: Proper exit
+      ASSERT((monitor_refresh_rate >= 30), L"Your primary monitor is less than 30Hz, you wouldn't be able to experience the game well, so the application will be closed!"); /* TODO: Proper exit */
     }
     
     win32_build_root_path_for_file(game_dll_full_path, ARRAY_COUNT(game_dll_full_path), L"pong.dll");
@@ -324,8 +334,50 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
             released = (was_down && !is_down) ? TRUE : FALSE;
             
             switch (key) {
+              /* NOTE: This will also be used as the 'start' button for the game. */
+              case VK_F11:
               case VK_RETURN: {
+                B32 is_alt_pressed;
+                B32 go_fullscreen;
                 
+                is_alt_pressed = (window_msg.lParam & (1 << 29)) != 0;
+                go_fullscreen = FALSE;
+                if (key == VK_F11 && released) {
+                  go_fullscreen = TRUE;
+                } else if (key == VK_RETURN && released && is_alt_pressed) {
+                  go_fullscreen = TRUE;
+                }
+                
+                if (go_fullscreen) {
+                  win32_debug_print(L"Trying to go fullscreen...\n");
+                  ASSERT(!global_is_window_topmost, L"Hey, man! This can be difficult to debug, turn it off.");
+                  /* toggle fullscreen */
+                  {
+                    LOCAL WINDOWPLACEMENT prev_window_placement = {0}; /* TODO: move to win32 state */
+                    DWORD window_styles;
+                    
+                    prev_window_placement.length = sizeof(prev_window_placement);
+                    window_styles = GetWindowLongW(window, GWL_STYLE);
+                    if (window_styles & WS_OVERLAPPEDWINDOW) {
+                      MONITORINFO monitor_info = {0};
+                      
+                      monitor_info.cbSize = sizeof(monitor_info);
+                      if ( (GetWindowPlacement(window, &prev_window_placement) && (GetMonitorInfoW(MonitorFromWindow(window, MONITOR_DEFAULTTOPRIMARY), &monitor_info))) ) {
+                        SetWindowLongW(window, GWL_STYLE,( window_styles & ~(WS_OVERLAPPEDWINDOW)));
+                        SetWindowPos(window, HWND_TOP, monitor_info.rcMonitor.left, monitor_info.rcMonitor.top, monitor_info.rcMonitor.right - monitor_info.rcMonitor.left,
+                                     monitor_info.rcMonitor.bottom - monitor_info.rcMonitor.top, (SWP_NOOWNERZORDER | SWP_FRAMECHANGED));
+                        global_is_fullscreen = TRUE;
+                      } else {
+                        /* TODO: Let user now it failed to go fullscreen! */
+                      }
+                    } else {
+                      SetWindowLongW(window, GWL_STYLE, (window_styles | WS_OVERLAPPEDWINDOW) & ~(WS_MAXIMIZEBOX | WS_SIZEBOX));
+                      SetWindowPlacement(window, &prev_window_placement);
+                      SetWindowPos(window, NULL, 0, 0, 0, 0, (SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED));
+                      global_is_fullscreen = FALSE;
+                    }
+                  }
+                }
               } break;
               
               case VK_ESCAPE: {
@@ -403,7 +455,6 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
           elapsed_microsecs   = elapsed_secs * 1000000.0f;
           elapsed_nanosecs    = elapsed_secs * 1000000000.0f;
           fps = CAST(int) (1.0f / elapsed_secs); /*CAST(int) (perf_frequency.QuadPart / perf_counter_diff.QuadPart);*/
-          dt = 1.0f / fps; /* 'delta time' should be used when we want something to NOT BE frame rate dependent */
           
           raw_elapsed_ms = elapsed_ms;
           
@@ -429,6 +480,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
               }
             }
             cooked_elapsed_ms = ((current_perf_counter.QuadPart - last_perf_counter.QuadPart) * 1000.0f) / perf_frequency.QuadPart;
+            dt = CAST(float) (current_perf_counter.QuadPart - last_perf_counter.QuadPart) / CAST(float) (perf_frequency.QuadPart); /* 'delta time' should be used when we want something to NOT BE frame rate dependent */
             last_perf_counter = current_perf_counter; /* NOTE: This should be here, right after the while loop to reach target ms per frame */
             
             /* NOTE: Debug 'time' print in the Visual Studio debugger */
@@ -444,17 +496,53 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
           }
         }
         
-        /* NOTE: This should be done last. First we 'wait' and then display the frame. */
-        window_dc = GetDC(window);
-        /*ASSERT(window_dc != 0);*/
-        /* NOTE: BitBlt is faster than SctretchDIBits, maybe, in the future, change to BitBlt and do a bitmap resize by hand for the 'front buffer'? */
-        StretchDIBits(window_dc, 0, 0, WIN32_FRONT_BUFFER_WIDTH, WIN32_FRONT_BUFFER_HEIGHT, 0, 0, game_back_buffer.width, game_back_buffer.height, game_back_buffer.memory, &win32_back_buffer.bmp_info, DIB_RGB_COLORS, SRCCOPY);
-        if (window_dc != 0) { /* This check exist's because when the window minimized this is 0 */
-          release_dc_result = ReleaseDC(window, window_dc);
-          ASSERT(release_dc_result != 0, L"Windows failed to release the main window device context!");
+        /* Display the 'back_buffer' in window */
+        {
+          S32 front_buffer_width, front_buffer_height;
+          S32 front_buffer_xoffset, front_buffer_yoffset;
+          
+          front_buffer_width = WIN32_FRONT_BUFFER_WIDTH;
+          front_buffer_height = WIN32_FRONT_BUFFER_HEIGHT;
+          front_buffer_xoffset = front_buffer_yoffset = 0;
+          /* TODO: Store this only once, when user toggle fullscreen, in 'win32_state' */
+          if (global_is_fullscreen) {
+            int i;
+            S32 monitor_max_width, monitor_max_height;
+            MONITORINFO monitor_info = {0};
+            /* NOTE: 16:9 resolutions divisible by 8 */
+            LOCAL S32 front_buffer_dimensions[][2] = { { 128,  72 }, { 256,  144 }, { 384,  216 }, { 512,  288 }, { 640,  360 }, { 768,  432 }, { 896,  504 }, { 1024, 576 }, { 1152, 648 }, { 1280, 720 }, { 1408, 792 }, { 1536, 864 }, { 1664, 936 }, { 1792, 1008 }, { 1920, 1080 }, { 2048, 1152 }, { 2176, 1224 }, { 2304, 1296 }, { 2432, 1368 }, { 2560, 1440 }, { 2688, 1512 }, { 2816, 1584 }, { 2944, 1656 }, { 3072, 1728 }, { 3200, 1800 }, { 3328, 1872 }, { 3456, 1944 }, { 3584, 2016 }, { 3712, 2088 }, { 3840, 2160 }, { 3968, 2232 }, { 4096, 2304 }, { 4224, 2376 }, { 4352, 2448 }, { 4480, 2520 }, { 4608, 2592 }, { 4736, 2664 }, { 4864, 2736 }, { 4992, 2808 }, { 5120, 2880 }, { 5248, 2952 }, { 5376, 3024 }, { 5504, 3096 }, { 5632, 3168 }, { 5760, 3240 }, { 5888, 3312 }, { 6016, 3384 }, { 6144, 3456 }, { 6272, 3528 }, { 6400, 3600 }, { 6528, 3672 }, { 6656, 3744 }, { 6784, 3816 }, { 6912, 3888 }, { 7040, 3960 }, { 7168, 4032 }, { 7296, 4104 }, { 7424, 4176 }, { 7552, 4248 }, { 7680, 4320 } }; /* up to 8k */
+            
+            monitor_info.cbSize = sizeof(monitor_info);
+            GetMonitorInfoW(MonitorFromWindow(window, MONITOR_DEFAULTTOPRIMARY), &monitor_info);
+            monitor_max_width = monitor_info.rcMonitor.right - monitor_info.rcMonitor.left;
+            monitor_max_height = monitor_info.rcMonitor.bottom - monitor_info.rcMonitor.top;
+            front_buffer_width = WIN32_BACK_BUFFER_WIDTH;
+            front_buffer_height = WIN32_BACK_BUFFER_HEIGHT;
+            for(i = 0; i < ARRAY_COUNT(front_buffer_dimensions); ++i) {
+              if (front_buffer_dimensions[i][0] > monitor_max_width) break;
+              if (front_buffer_dimensions[i][1] > monitor_max_height) break;
+              front_buffer_width = front_buffer_dimensions[i][0];
+              front_buffer_height = front_buffer_dimensions[i][1];
+            }
+            /* win32_debug_print(L"front_buffer width: %d, front_buffer height: %d \n", front_buffer_width, front_buffer_height);*/
+            front_buffer_xoffset = (monitor_max_width - front_buffer_width) / 2;
+            front_buffer_yoffset = (monitor_max_height - front_buffer_height) / 2;
+            /* NOTE: Should I 'PatBlit(...)' the not-drawn regions? */
+          }
+          
+          window_dc = GetDC(window); /* NOTE: Maybe this isn't necessary at all, since I'll do the rendering myself, I don't really need to release the DC everyframe. */
+          /*ASSERT(window_dc != 0);*/
+          /* NOTE: BitBlt is faster than SctretchDIBits, maybe, in the future, change to BitBlt and do a bitmap resize by hand for the 'front buffer'? */
+          StretchDIBits(window_dc, front_buffer_xoffset, front_buffer_yoffset, front_buffer_width, front_buffer_height, 0, 0, game_back_buffer.width, game_back_buffer.height, game_back_buffer.memory, &win32_back_buffer.bmp_info, DIB_RGB_COLORS, SRCCOPY);
+          if (window_dc != 0) { /* This check exist's because when the window minimized this is 0 */
+            release_dc_result = ReleaseDC(window, window_dc);
+            ASSERT(release_dc_result != 0, L"Windows failed to release the main window device context!");
+          }
         }
+        
+        
       }
-    };
+    }
   }
   return 0;
 }
