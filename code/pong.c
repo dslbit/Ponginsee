@@ -1,3 +1,5 @@
+#include "pong_base.h"
+#include "pong_math.h"
 #include "pong_platform.h"
 
 /* TODO: Move to 'renderer' */
@@ -62,17 +64,34 @@ EXTERNIZE void draw_rect(GameBackBuffer *back_buffer, F32 x, F32 y, F32 width, F
 
 /* TODO: Platform-independent: game memory, sound output, file I/O */
 EXTERNIZE GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
-  F32 rect_move_speed;
+  if (!state->initialized) {
+    state->initialized = TRUE;
+  }
   
-  rect_move_speed = 100.0f * input->dt;
-  if (input->player1.up.pressed)    { state->player_y -= rect_move_speed; }
-  if (input->player1.down.pressed)  { state->player_y += rect_move_speed; }
-  if (input->player1.left.pressed)  { state->player_x -= rect_move_speed; }
-  if (input->player1.right.pressed) { state->player_x += rect_move_speed; }
+  v2_zero(&state->player.acc);
+  
+  if (input->player1.up.pressed)    { state->player.acc.y = -1; }
+  if (input->player1.down.pressed)  { state->player.acc.y = 1;  }
+  if (input->player1.left.pressed)  { state->player.acc.x = -1; }
+  if (input->player1.right.pressed) { state->player.acc.x = 1;  }
+  
+  state->player.acc = v2_mul(state->player.acc, 11500.0f);
+  state->player.acc = v2_mul(state->player.acc, input->dt);
+  state->player.vel = v2_add(state->player.vel, v2_mul(v2_add(state->player.vel, state->player.acc), input->dt));
+  state->player.vel = v2_mul(state->player.vel, 0.75f);
+  state->player.pos = v2_add(state->player.pos, state->player.vel);
   
   /* Dirty clear background before drawing, TODO: a proper 'draw_background' */
-  draw_rect(back_buffer, 0.0f, 0.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, 1.0f, 0.0f, 1.0f);
+  draw_rect(back_buffer, 0.0f, 0.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, 0.0f, 0.0f, 0.0f);
   
   /* Player (rect) representation */
-  draw_rect(back_buffer, 50 + state->player_x, 50 + state->player_y, 15, 15, 0.364705f, 0.464705f, 0.964705f);
+  {
+    F32 player_width, player_height;
+    
+    player_width = 15 + ABS(state->player.vel.x * 2) - ABS(state->player.vel.y);
+    player_height = 15 + ABS(state->player.vel.y * 2) - ABS(state->player.vel.x);
+    
+    draw_rect(back_buffer, 50 + state->player.pos.x, 50 + state->player.pos.y, player_width, player_height, 0.364705f, 0.464705f, 0.964705f);
+  }
+  
 }
