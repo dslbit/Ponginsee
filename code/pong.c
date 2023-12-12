@@ -34,10 +34,10 @@ EXTERNIZE void draw_rect(GameBackBuffer *back_buffer, F32 x, F32 y, F32 width, F
   U32 color;
   
   /* round to int */
-  start_x = round_f32_to_s32(x);
-  start_y = round_f32_to_s32(y);
-  end_x   = round_f32_to_s32(x + width);
-  end_y   = round_f32_to_s32(y + height);
+  start_x = round_f32_to_s32(x - width/2.0f);
+  start_y = round_f32_to_s32(y - height/2.0f);
+  end_x   = round_f32_to_s32(start_x + width);
+  end_y   = round_f32_to_s32(start_y + height);
   
   /* clip to buffer */
   if (start_x < 0) start_x = 0;
@@ -72,8 +72,6 @@ EXTERNIZE GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
   
   if (input->player1.up.pressed)    { state->player.acc.y = -1; }
   if (input->player1.down.pressed)  { state->player.acc.y = 1;  }
-  if (input->player1.left.pressed)  { state->player.acc.x = -1; }
-  if (input->player1.right.pressed) { state->player.acc.x = 1;  }
   
   state->player.acc = v2_mul(state->player.acc, 11500.0f);
   state->player.acc = v2_mul(state->player.acc, input->dt);
@@ -82,14 +80,14 @@ EXTERNIZE GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
   state->player.pos = v2_add(state->player.pos, state->player.vel);
   
   /* Dirty clear background before drawing, TODO: a proper 'draw_background' */
-  draw_rect(back_buffer, 0.0f, 0.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, 0.0f, 0.0f, 0.0f);
+  draw_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, 0.0f, 0.0f, 0.0f);
   
   /* Player (rect) representation */
   {
     F32 player_width, player_height;
     
-    player_width = 15 + ABS(state->player.vel.x * 2) - ABS(state->player.vel.y);
-    player_height = 15 + ABS(state->player.vel.y * 2) - ABS(state->player.vel.x);
+    player_width = 14 + ABS(state->player.vel.x * 3.25f) - ABS(state->player.vel.y * 0.45f);
+    player_height = 75 + ABS(state->player.vel.y * 3.25f) - ABS(state->player.vel.x * 0.45f);
     
     draw_rect(back_buffer, 50 + state->player.pos.x, 50 + state->player.pos.y, player_width, player_height, 0.364705f, 0.464705f, 0.964705f);
   }
