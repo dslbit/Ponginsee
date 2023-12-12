@@ -46,7 +46,7 @@ struct Win32GameCode {
 GLOBAL int global_running = FALSE;
 GLOBAL Win32BackBuffer win32_back_buffer;
 GLOBAL wchar_t global_path_to_exe_root[MAX_PATH];
-GLOBAL S32 global_show_cursor;
+GLOBAL S32 global_show_cursor = TRUE;
 GLOBAL B32 global_is_window_topmost;
 GLOBAL B32 global_is_fullscreen;
 

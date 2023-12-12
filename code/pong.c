@@ -66,30 +66,59 @@ EXTERNIZE void draw_rect(GameBackBuffer *back_buffer, F32 x, F32 y, F32 width, F
 EXTERNIZE GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
   if (!state->initialized) {
     state->initialized = TRUE;
+    
+    state->player.pos.x = 15; /* player_xoffset */
+    state->player.pos.y = (CAST(F32) back_buffer->height) / 2.0f;
   }
   
-  v2_zero(&state->player.acc);
+  /* NOTE: Player movement code */
+  {
+    v2_zero(&state->player.acc);
+    
+    if (input->player1.up.pressed)    { state->player.acc.y = -1; }
+    if (input->player1.down.pressed)  { state->player.acc.y = 1;  }
+    
+    state->player.acc = v2_mul(state->player.acc, 5500.0f);
+    state->player.vel = v2_add(state->player.vel, v2_mul(state->player.acc, input->dt));
+    state->player.vel = v2_add(state->player.vel, v2_mul(state->player.vel, -0.15f));
+    state->player.pos = v2_add(state->player.pos, v2_mul(state->player.vel, input->dt));
+    
+    state->player.width = 12 - ABS(state->player.vel.y * 0.00159f);
+    state->player.height = 70 + ABS(state->player.vel.y * 0.05f);
+  }
   
-  if (input->player1.up.pressed)    { state->player.acc.y = -1; }
-  if (input->player1.down.pressed)  { state->player.acc.y = 1;  }
-  
-  state->player.acc = v2_mul(state->player.acc, 11500.0f);
-  state->player.acc = v2_mul(state->player.acc, input->dt);
-  state->player.vel = v2_add(state->player.vel, v2_mul(v2_add(state->player.vel, state->player.acc), input->dt));
-  state->player.vel = v2_mul(state->player.vel, 0.75f);
-  state->player.pos = v2_add(state->player.pos, state->player.vel);
+  /* NOTE: Axis-aligned Collision - @IMPORTANT: make sure it's above the 'clear_background' */
+  {
+    /* Player collision */
+    {
+      S32 player_top, player_bottom;
+      
+      player_top = CAST(S32) (state->player.pos.y - (state->player.height / 2.0f));
+      if (player_top < 0) {
+        state->player.pos.y = state->player.height / 2.0f;
+        state->player.vel = v2_add(state->player.vel, v2_mul(state->player.vel, -2.5f));
+      }
+#if 0
+      draw_rect(back_buffer, state->player.pos.x, CAST(F32) player_top, 5, 5, 1.0f, 0.0f, 1.0f); /* debug draw*/
+#endif
+      
+      player_bottom = CAST(S32) (state->player.pos.y + (state->player.height / 2.0f));
+      if (player_bottom > back_buffer->height) {
+        state->player.pos.y = (CAST(F32) back_buffer->height) - state->player.height / 2.0f;
+        state->player.vel = v2_add(state->player.vel, v2_mul(state->player.vel, -2.5f));
+      }
+#if 0
+      draw_rect(back_buffer, state->player.pos.x, CAST(F32) player_bottom, 5, 5, 1.0f, 0.0f, 1.0f); /* debug draw*/
+#endif
+    }
+  }
   
   /* Dirty clear background before drawing, TODO: a proper 'draw_background' */
   draw_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, 0.0f, 0.0f, 0.0f);
   
   /* Player (rect) representation */
   {
-    F32 player_width, player_height;
-    
-    player_width = 14 + ABS(state->player.vel.x * 3.25f) - ABS(state->player.vel.y * 0.45f);
-    player_height = 75 + ABS(state->player.vel.y * 3.25f) - ABS(state->player.vel.x * 0.45f);
-    
-    draw_rect(back_buffer, 50 + state->player.pos.x, 50 + state->player.pos.y, player_width, player_height, 0.364705f, 0.464705f, 0.964705f);
+    draw_rect(back_buffer, state->player.pos.x, state->player.pos.y, state->player.width, state->player.height, 0.364705f, 0.464705f, 0.964705f);
   }
   
 }

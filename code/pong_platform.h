@@ -37,6 +37,9 @@ struct Player {
   V2 pos;
   V2 vel;
   V2 acc;
+  
+  F32 width;
+  F32 height;
 };
 
 typedef struct GameState GameState;
