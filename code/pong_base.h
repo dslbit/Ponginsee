@@ -25,6 +25,8 @@
 #define EXTERNIZE
 #endif
 
+#define ASSERT(_exp, _msg) if (!(_exp)) { *((int *) 0) = 0; }
+
 /* TODO: Types and later make it precise using compiler checks, c version checks and 'stdint.h' */
 typedef signed   int        B32;
 

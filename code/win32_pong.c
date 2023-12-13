@@ -4,6 +4,11 @@
 #define UNICODE
 
 #if defined(WIN32_DEBUG)
+
+#if defined(ASSERT)
+#undef ASSERT
+#endif
+
 #define ASSERT(_exp, _msg) if (!(_exp)) {\
 MessageBoxW(0, L"Expression: " TO_STRING(_exp) L"\n" _msg L"\n\nAt line: " TO_STRING(__LINE__) L"\n\nIn: " __FILE__, L"Assertion Failed", (MB_ICONERROR | MB_OK));\
 __debugbreak();\
@@ -11,7 +16,7 @@ __debugbreak();\
 }
 #else
 #define ASSERT(_exp)
-#endif
+#endif /* defined(WIN32_DEBUG) */
 
 /* 640/360, 1280/720*/
 #define WIN32_FRONT_BUFFER_WIDTH (640)
