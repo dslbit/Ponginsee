@@ -92,7 +92,7 @@ INTERNAL Win32GameCode win32_load_game_code(wchar_t *dll_full_path, wchar_t *tem
     
     /* @IMPORTANT: Remember to add checks here for every function in the game layer that should be exported */
     if (!game_code.is_valid) {
-      game_code.update_and_render = game_update_and_render_stub;
+      game_code.update_and_render = 0;
     }
   }
   
@@ -107,7 +107,7 @@ INTERNAL void win32_unload_game_code(Win32GameCode *game_code) {
   }
   
   game_code->is_valid = FALSE;
-  game_code->update_and_render = game_update_and_render_stub;
+  game_code->update_and_render = 0;
 }
 
 INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wparam, LPARAM lparam) {

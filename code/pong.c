@@ -69,6 +69,12 @@ EXTERNIZE GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
     
     state->player.pos.x = 15; /* player_xoffset */
     state->player.pos.y = (CAST(F32) back_buffer->height) / 2.0f;
+    
+    state->ball.width = 7;
+    state->ball.height = 7;
+    state->ball.pos.x = back_buffer->width / 2.0f;
+    state->ball.pos.y = back_buffer->height / 2.0f;
+    state->ball.vel = v2_create(-255.0f, -10.0f);
   }
   
   /* NOTE: Player movement code */
@@ -87,6 +93,17 @@ EXTERNIZE GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
     state->player.height = 70 + ABS(state->player.vel.y * 0.05f);
   }
   
+  /* NOTE: Ball movement code - TODO: Remember to clamp ball velocity < 'player_width' */
+  {
+    Ball *ball;
+    
+    ball = &state->ball;
+    v2_zero(&ball->acc);
+    
+    /* TODO: Calc ball acceleration ; maybe after player hit? */
+    ball->pos = v2_add(ball->pos, v2_mul(ball->vel, input->dt));
+  }
+  
   /* NOTE: Axis-aligned Collision - @IMPORTANT: make sure it's above the 'clear_background' */
   {
     /* Player collision */
@@ -99,7 +116,7 @@ EXTERNIZE GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
         state->player.vel = v2_add(state->player.vel, v2_mul(state->player.vel, -2.5f));
       }
 #if 0
-      draw_rect(back_buffer, state->player.pos.x, CAST(F32) player_top, 5, 5, 1.0f, 0.0f, 1.0f); /* debug draw*/
+      draw_rect(back_buffer, state->player.pos.x, CAST(F32) player_top, 5, 5, 1.0f, 0.0f, 1.0f); /* hit point debug draw */
 #endif
       
       player_bottom = CAST(S32) (state->player.pos.y + (state->player.height / 2.0f));
@@ -108,17 +125,63 @@ EXTERNIZE GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
         state->player.vel = v2_add(state->player.vel, v2_mul(state->player.vel, -2.5f));
       }
 #if 0
-      draw_rect(back_buffer, state->player.pos.x, CAST(F32) player_bottom, 5, 5, 1.0f, 0.0f, 1.0f); /* debug draw*/
+      draw_rect(back_buffer, state->player.pos.x, CAST(F32) player_bottom, 5, 5, 1.0f, 0.0f, 1.0f); /* hit point debug draw */
 #endif
+    }
+    
+    /* Ball collision */
+    {
+      Ball *ball;
+      S32 ball_hit_point_top, ball_hit_point_bottom, ball_hit_point_left, ball_hit_point_right;
+      
+      ball = &state->ball;
+      ball_hit_point_top = CAST(S32) (ball->pos.y - ball->height/2.0f);
+      if (ball_hit_point_top < 0) {
+        ball->pos.y = ball->height/2.0f;
+        ball->vel.y *= -1;
+      }
+      
+      ball_hit_point_bottom = CAST(S32) (ball->pos.y + ball->height/2.0f);
+      if (ball_hit_point_bottom  > back_buffer->height) {
+        ball->pos.y = CAST(F32) (back_buffer->height - ball->height/2.0f);
+        ball->vel.y *= -1;
+      }
+      
+      ball_hit_point_left = CAST(S32) (ball->pos.x - ball->width/2.0f);
+      if (ball_hit_point_left < 0) {
+        ball->pos.x = ball->width/2.0f;
+        ball->vel.x *= -1;
+      }
+      
+      ball_hit_point_right = CAST(S32) (ball->pos.x + ball->width/2.0f);
+      if (ball_hit_point_right > back_buffer->width) {
+        ball->pos.x = back_buffer->width - ball->width/2.0f;
+        ball->vel.x *= -1;
+      }
+    }
+    
+    /* TODO: Ball vs Player vs Opponent collision */
+    {
+      
     }
   }
   
-  /* Dirty clear background before drawing, TODO: a proper 'draw_background' */
-  draw_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, 0.0f, 0.0f, 0.0f);
-  
-  /* Player (rect) representation */
+  /* TODO: Convert hex/rgb colors to float version */
+  /* NOTE: Rendering */
   {
-    draw_rect(back_buffer, state->player.pos.x, state->player.pos.y, state->player.width, state->player.height, 0.364705f, 0.464705f, 0.964705f);
+    /* Dirty clear background before drawing, TODO: a proper 'draw_background' */
+    draw_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, 31.0f/255.0f, 23.0f/255.0f, 35.0f/255);
+    
+    /* Player (rect) representation */
+    draw_rect(back_buffer, state->player.pos.x, state->player.pos.y, state->player.width, state->player.height, 70.0f/255.0f, 86.0f/255.0f, 165.0f/255.0f);
+    
+    /* Ball (rect) representation */
+    draw_rect(back_buffer, state->ball.pos.x, state->ball.pos.y, state->ball.width, state->ball.height, 62.0f/255.0f, 197.0f/255.0f, 75.0f/255.0f);
   }
+  
+  
+  
+  
+  
   
 }
