@@ -55,6 +55,17 @@ struct Ball {
   F32 height;
 };
 
+typedef struct Opponent Opponent;
+struct Opponent {
+  V2 pos;
+  V2 vel;
+  V2 acc;
+  
+  /* This is used for collision and drawing */
+  F32 width;
+  F32 height;
+};
+
 /* TODO: Opponent */
 
 typedef struct GameState GameState;
@@ -62,6 +73,7 @@ struct GameState {
   B32 initialized;
   
   Player player;
+  Opponent opponent;
   Ball ball;
 };
 
