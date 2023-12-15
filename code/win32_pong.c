@@ -326,6 +326,18 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
 #endif
       }
       
+      /* NOTE: Clearing controller input for new samples
+-* This is needed in this case because the 'released' state
+-* of the keyboard is not like the 'pressed' state. Anyway,
+-* Windows stuff? */
+      {
+        int i;
+        
+        for (i = 0; i < ARRAY_COUNT(game_input.player1.buttons); ++i) {
+          game_input.player1.buttons[i].released = FALSE;
+        }
+      }
+      
       /* NOTE: Input */
       while (PeekMessageW(&window_msg, 0, 0, 0, PM_REMOVE)) {
         switch (window_msg.message) {
@@ -343,15 +355,18 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
             released = (was_down && !is_down) ? TRUE : FALSE;
             
             switch (key) {
-              /* NOTE: This will also be used as the 'start' button for the game. */
+              /* NOTE: This will also be used as the 'start' button for the game (VK_RETURN). */
               case VK_F11:
-              case VK_RETURN: {
+              case VK_RETURN:{
                 B32 is_alt_pressed;
                 B32 go_fullscreen;
                 
                 is_alt_pressed = (window_msg.lParam & (1 << 29)) != 0;
                 go_fullscreen = FALSE;
-                if (key == VK_F11 && released) {
+                if (key == VK_RETURN && is_alt_pressed == FALSE) {
+                  game_input.player1.start.pressed = pressed;
+                  game_input.player1.start.released = released;
+                } else if (key == VK_F11 && released) {
                   go_fullscreen = TRUE;
                 } else if (key == VK_RETURN && released && is_alt_pressed) {
                   go_fullscreen = TRUE;
