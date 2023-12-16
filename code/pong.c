@@ -2,8 +2,10 @@
 #include "pong_math.h"
 #include "pong_platform.h"
 
+EXTERN_OPEN /* extern "C" { */
+
 /* TODO: Move to 'renderer' */
-EXTERNIZE void draw_pixel(GameBackBuffer *back_buffer, S32 x, S32 y, U32 color) {
+void draw_pixel(GameBackBuffer *back_buffer, S32 x, S32 y, U32 color) {
   U32 *pixel;
   
   if (x > back_buffer->width || x < 0) return;
@@ -12,22 +14,8 @@ EXTERNIZE void draw_pixel(GameBackBuffer *back_buffer, S32 x, S32 y, U32 color) 
   *pixel = color; /* AARRGGBB */
 }
 
-INTERNAL S32 round_f32_to_s32(F32 value) {
-  S32 result;
-  
-  result = CAST(S32) (value + 0.5f);
-  return result;
-}
-
-INTERNAL U32 round_f32_to_u32(F32 value) {
-  U32 result;
-  
-  result = CAST(U32) (value + 0.5f);
-  return result;
-}
-
-/* TODO: Move to 'renderer' ; color struct ; make_rgb_to_float/make_hex_to_float? */
-EXTERNIZE void draw_rect(GameBackBuffer *back_buffer, F32 x, F32 y, F32 width, F32 height, F32 R, F32 G, F32 B) {
+/* TODO: Move to 'renderer' ; color struct ; make_rgb_to_float/make_hex_to_float? ; move away from pixels (meter-to-pixels, pixels-to-meters)? */
+void draw_rect(GameBackBuffer *back_buffer, F32 x, F32 y, F32 width, F32 height, F32 R, F32 G, F32 B) {
   S32 i, j;
   S32 start_x, start_y, end_x, end_y;
   U32 *pixel;
@@ -63,7 +51,7 @@ EXTERNIZE void draw_rect(GameBackBuffer *back_buffer, F32 x, F32 y, F32 width, F
 }
 
 /* TODO: Platform-independent: game memory, sound output, file I/O */
-EXTERNIZE GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
+GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
   if (!state->initialized) {
     state->initialized = TRUE;
     
@@ -81,11 +69,26 @@ EXTERNIZE GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
     state->ball.width = state->ball.height = 9;
     state->ball.pos.x = back_buffer->width / 2.0f;
     state->ball.pos.y = back_buffer->height / 2.0f;
-    state->ball.vel = v2_create(-555.0f, -210.0f);
+    state->ball.vel = v2_create(-250.0f, -110.0f);
   }
   
   if (!state->is_level_running && input->player1.start.released) {
     state->is_level_running = TRUE;
+    
+    /* NOTE: Reset some variables to start the new round */
+    state->player.pos.y = (CAST(F32) back_buffer->height) / 2.0f;
+    state->player.width = 12;
+    state->player.height = 70;
+    
+    state->opponent.pos.y = back_buffer->height / 2.0f;
+    state->opponent.width = 12;
+    state->opponent.height = 70;
+    
+    state->ball.pos.x = back_buffer->width / 2.0f;
+    state->ball.pos.y = back_buffer->height / 2.0f;
+    state->ball.vel = v2_create(-250.0f, -110.0f);
+    
+    /* TODO: Render arena state again? */
   }
   
   if (state->is_level_running) {
@@ -115,25 +118,29 @@ EXTERNIZE GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
       opponent = &state->opponent;
       v2_zero(&opponent->acc);
       
+#if 0
       /* NOTE: For now, opponent movement code makes the opponent almost invincible */
-      if ( (state->ball.vel.y < 0) && (state->ball.pos.y < (opponent->pos.y - opponent->height/5.0f)) ) {
+      if ( (state->ball.vel.y < 0) && (state->ball.pos.y < (opponent->pos.y - opponent->height/4.0f)) ) {
         opponent->acc.y = -1.0f;
-      } else if ( (state->ball.vel.y > 0) && (state->ball.pos.y > (opponent->pos.y + opponent->height/5.0f)) ) {
+      } else if ( (state->ball.vel.y > 0) && (state->ball.pos.y > (opponent->pos.y + opponent->height/4.0f)) ) {
         opponent->acc.y = 1.0f;
       }
       
-      if ( (ABS(state->ball.pos.y - opponent->pos.y) > opponent->height) ) {
-        opponent->acc = v2_mul(opponent->acc, 25500.0f);
+      if ( (ABS(state->ball.pos.y - opponent->pos.y) > opponent->height * 1.5f) ) {
+        opponent->acc = v2_mul(opponent->acc, 10500.0f);
       } else {
-        opponent->acc = v2_mul(opponent->acc, 3500.0f);
+        opponent->acc = v2_mul(opponent->acc, 4500.0f);
       }
       
       opponent->vel = v2_add(opponent->vel, v2_mul(opponent->acc, input->dt));
       opponent->vel = v2_add(opponent->vel, v2_mul(opponent->vel, -0.15f));
       opponent->pos = v2_add(opponent->pos, v2_mul(opponent->vel, input->dt));
       
+      
       opponent->width = 12 - ABS(opponent->vel.y * 0.00159f);
       opponent->height = 70 + ABS(opponent->vel.y * 0.05f);
+#endif
+      opponent->pos.y = state->ball.pos.y;
     }
     
     /* NOTE: Ball movement code - TODO: Remember to clamp ball velocity < 'player_width' */
@@ -152,6 +159,7 @@ EXTERNIZE GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
         ball_mag_squared = v2_mag_squared( v2_mul(ball->vel, input->dt) );
         player_width_squared = SQUARE(state->player.width);
         if (ball_mag_squared > player_width_squared) {
+          ball->vel = v2_add(ball->vel, v2_mul(ball->vel, -0.05f));
           /* TODO: Set ball mag */
 #if 0
           ASSERT(0, "Ball is too fast!!!");
@@ -225,7 +233,6 @@ EXTERNIZE GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
           ball->vel.y *= -1;
         }
         
-        /* TODO: Maybe reset all position when make a score? */
         ball_hit_point_left = CAST(S32) (ball->pos.x - ball->width/2.0f);
         if (ball_hit_point_left < 0) {
           ball->pos.x = back_buffer->width/2.0f;
@@ -272,64 +279,67 @@ EXTERNIZE GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
           is_colliding = TRUE;
         }
         
-        /* TODO: Move ball up/down based on player velocity and hit point */
         if (is_colliding) {
-#if 0
-          if (ball->pos.y > player->pos.y) {
-            ball->vel.y = (ball->vel.y > 0) ? -ball->pos.y : ball->pos.y;
-          } else {
-            ball->vel.y = (ball->vel.y < 0) ? ABS(ball->pos.y) : ball->pos.y;
-          }
-#endif
+          F32 ball_y_direction;
           
+          if (player->vel.y < 0) {
+            ball_y_direction = -1;
+          } else if (player->vel.y > 0) {
+            ball_y_direction = 1;
+          } else {
+            ball_y_direction = 0;
+          }
+          
+          ball->vel.y = ball_y_direction * ABS(ball->vel.y);
+          ball->vel = v2_mul(ball->vel, CLAMP(player->vel.y * 0.5f, 1.5f, 2.0f));
           ball->pos.x = (player->pos.x + player->width/2.0f) + (ball->width/2.0f) + 1;
           ball->vel.x *= -1;
         }
       }
+    }
+    
+    /* Ball VS Opponent collision */
+    {
+      Opponent *opponent;
+      Ball *ball;
+      S32 opponent_hit_point_top, opponent_hit_point_bottom, opponent_hit_point_left, opponent_hit_point_right;
+      S32 ball_hit_point_top, ball_hit_point_bottom, ball_hit_point_left, ball_hit_point_right;
+      B32 is_colliding;
       
-      /* Ball VS Opponent collision */
-      {
-        Opponent *opponent;
-        Ball *ball;
-        S32 opponent_hit_point_top, opponent_hit_point_bottom, opponent_hit_point_left, opponent_hit_point_right;
-        S32 ball_hit_point_top, ball_hit_point_bottom, ball_hit_point_left, ball_hit_point_right;
-        B32 is_colliding;
+      is_colliding = FALSE;
+      
+      opponent = &state->opponent;
+      opponent_hit_point_top = CAST(S32) (opponent->pos.y - opponent->height/2.0f);
+      opponent_hit_point_bottom = CAST(S32) (opponent->pos.y + opponent->height/2.0f);
+      opponent_hit_point_left = CAST(S32) (opponent->pos.x - opponent->width/2.0f);
+      opponent_hit_point_right = CAST(S32) (opponent->pos.x + opponent->width/2.0f);
+      
+      ball = &state->ball;
+      ball_hit_point_top = CAST(S32) (ball->pos.y - ball->height/2.0f);
+      ball_hit_point_bottom = CAST(S32) (ball->pos.y + ball->height/2.0f);
+      ball_hit_point_left = CAST(S32) (ball->pos.x - ball->width/2.0f);
+      ball_hit_point_right = CAST(S32) (ball->pos.x + ball->width/2.0f);
+      
+      /* AABB vs AABB - Ball vs Opponent */
+      if ( (ball_hit_point_left >= opponent_hit_point_left) && (ball_hit_point_left <= opponent_hit_point_right) && (ball_hit_point_top >= opponent_hit_point_top) && (ball_hit_point_bottom <= opponent_hit_point_bottom) ) {
+        is_colliding = TRUE;
+      } else if ( (ball_hit_point_right >= opponent_hit_point_left) && (ball_hit_point_right <= opponent_hit_point_right) && (ball_hit_point_top >= opponent_hit_point_top) && (ball_hit_point_bottom <= opponent_hit_point_bottom) ) {
+        is_colliding = TRUE;
+      }
+      
+      /* TODO: Move ball up/down based on opponent velocity and hit point */
+      if (is_colliding) {
         
-        is_colliding = FALSE;
-        
-        opponent = &state->opponent;
-        opponent_hit_point_top = CAST(S32) (opponent->pos.y - opponent->height/2.0f);
-        opponent_hit_point_bottom = CAST(S32) (opponent->pos.y + opponent->height/2.0f);
-        opponent_hit_point_left = CAST(S32) (opponent->pos.x - opponent->width/2.0f);
-        opponent_hit_point_right = CAST(S32) (opponent->pos.x + opponent->width/2.0f);
-        
-        ball = &state->ball;
-        ball_hit_point_top = CAST(S32) (ball->pos.y - ball->height/2.0f);
-        ball_hit_point_bottom = CAST(S32) (ball->pos.y + ball->height/2.0f);
-        ball_hit_point_left = CAST(S32) (ball->pos.x - ball->width/2.0f);
-        ball_hit_point_right = CAST(S32) (ball->pos.x + ball->width/2.0f);
-        
-        /* AABB vs AABB - Ball vs Opponent */
-        if ( (ball_hit_point_left >= opponent_hit_point_left) && (ball_hit_point_left <= opponent_hit_point_right) && (ball_hit_point_top >= opponent_hit_point_top) && (ball_hit_point_bottom <= opponent_hit_point_bottom) ) {
-          is_colliding = TRUE;
-        } else if ( (ball_hit_point_right >= opponent_hit_point_left) && (ball_hit_point_right <= opponent_hit_point_right) && (ball_hit_point_top >= opponent_hit_point_top) && (ball_hit_point_bottom <= opponent_hit_point_bottom) ) {
-          is_colliding = TRUE;
-        }
-        
-        /* TODO: Move ball up/down based on opponent velocity and hit point */
-        if (is_colliding) {
-          
 #if 0
-          if (ball->pos.y > opponent->pos.y) {
-            ball->vel.y = (ball->vel.y > 0) ? -ball->pos.y : ball->pos.y;
-          } else {
-            ball->vel.y = (ball->vel.y < 0) ? ABS(ball->pos.y) : ball->pos.y;
-          }
-#endif
-          
-          ball->pos.x = (opponent->pos.x - opponent->width/2.0f) - (ball->width/2.0f) + 1;
-          ball->vel.x *= -1;
+        if (ball->pos.y > opponent->pos.y) {
+          ball->vel.y = (ball->vel.y > 0) ? -ball->pos.y : ball->pos.y;
+        } else {
+          ball->vel.y = (ball->vel.y < 0) ? ABS(ball->pos.y) : ball->pos.y;
         }
+#endif
+        
+        ball->pos.x = (opponent->pos.x - opponent->width/2.0f) - (ball->width/2.0f) + 1;
+        ball->vel.x *= -1;
       }
     }
   }
@@ -347,13 +357,15 @@ EXTERNIZE GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
       draw_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, 3, CAST(F32) back_buffer->height, 226.0f/255.0f, 226.0f/255.0f, 226.0f/255.0f);
     }
     
-    /* Player (rect) representation */
+    /* Player (rect) representation - TODO: change color when moving */
     draw_rect(back_buffer, state->player.pos.x, state->player.pos.y, state->player.width, state->player.height, 70.0f/255.0f, 86.0f/255.0f, 165.0f/255.0f);
     
-    /* Opponent (rect) representation */
+    /* Opponent (rect) representation - TODO: change color when moving */
     draw_rect(back_buffer, state->opponent.pos.x, state->opponent.pos.y, state->opponent.width, state->opponent.height, 245.0f/255.0f, 70.0f/255.0f, 76.0f/255.0f);
     
-    /* Ball (rect) representation */
+    /* Ball (rect) representation - TODO: change color if it's FAST */
     draw_rect(back_buffer, state->ball.pos.x, state->ball.pos.y, state->ball.width, state->ball.height, 62.0f/255.0f, 197.0f/255.0f, 75.0f/255.0f);
   }
 }
+
+EXTERN_CLOSE /* } */

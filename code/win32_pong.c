@@ -496,7 +496,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
             /* win32_debug_print(L"front_buffer width: %d, front_buffer height: %d \n", front_buffer_width, front_buffer_height);*/
             front_buffer_xoffset = (monitor_max_width - front_buffer_width) / 2;
             front_buffer_yoffset = (monitor_max_height - front_buffer_height) / 2;
-            /* NOTE: Should I 'PatBlit(...)' the not-drawn regions? */
+            /* NOTE: Should I 'PatBlit(...)' the not-drawn regions? - TODO: Yes! PatBlit will be necessary */
           }
           
           window_dc = GetDC(window); /* NOTE: Maybe this isn't necessary at all, since I'll do the rendering myself, I don't really need to release the DC everyframe. */

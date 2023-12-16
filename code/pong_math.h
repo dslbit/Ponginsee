@@ -3,6 +3,22 @@
 
 #define SQUARE(_x) ((_x) * (_x))
 
+EXTERN_OPEN /* extern "C" { */
+
+INTERNAL S32 round_f32_to_s32(F32 value) {
+  S32 result;
+  
+  result = CAST(S32) (value + 0.5f);
+  return result;
+}
+
+INTERNAL U32 round_f32_to_u32(F32 value) {
+  U32 result;
+  
+  result = CAST(U32) (value + 0.5f);
+  return result;
+}
+
 typedef struct V2 V2;
 struct V2 {
   F32 x;
@@ -70,4 +86,5 @@ F32 v2_mag_squared(V2 a) {
   return result;
 }
 
+EXTERN_CLOSE /* } */
 #endif //PONG_MATH_H

@@ -1,6 +1,8 @@
 #ifndef PONG_PLATFORM_H
 #define PONG_PLATFORM_H
 
+EXTERN_OPEN /* extern "C" { */
+
 typedef struct GameBackBuffer GameBackBuffer;
 struct GameBackBuffer {
   S32 width;
@@ -72,8 +74,6 @@ struct Opponent {
   F32 height;
 };
 
-/* TODO: Opponent */
-
 typedef struct GameState GameState;
 struct GameState {
   B32 initialized;
@@ -87,9 +87,8 @@ struct GameState {
 #define GAME_UPDATE_AND_RENDER_PROTOTYPE(_name) void _name(GameBackBuffer *back_buffer, GameInput *input, GameState *state)
 typedef GAME_UPDATE_AND_RENDER_PROTOTYPE(GameUpdateAndRenderFuncType);
 
-EXTERNIZE GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render);
+GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render);
 
-
-
+EXTERN_CLOSE /* } */
 
 #endif /* PONG_PLATFORM_H */

@@ -19,6 +19,20 @@
 
 #define ABS(_x) ( ((_x) < 0 ? -(_x) : (_x)) )
 
+#define CLAMP(_x, _min, _max) ( ((_x) < (_min)) ? (_min) : (((_x) > (_max)) ? (_max) : (_x)) )
+
+#if defined(__cplusplus)
+#define EXTERN_OPEN extern "C" {
+#else
+#define EXTERN_OPEN
+#endif
+
+#if defined(__cplusplus)
+#define EXTERN_CLOSE }
+#else
+#define EXTERN_CLOSE
+#endif
+
 #if defined(__cplusplus)
 #define EXTERNIZE extern "C"
 #else
