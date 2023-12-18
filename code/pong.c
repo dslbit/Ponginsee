@@ -1,54 +1,10 @@
 #include "pong_base.h"
 #include "pong_math.h"
+#include "pong_color.h"
 #include "pong_platform.h"
+#include "pong_renderer.h"
 
 EXTERN_OPEN /* extern "C" { */
-
-/* TODO: Move to 'renderer' */
-void draw_pixel(GameBackBuffer *back_buffer, S32 x, S32 y, U32 color) {
-  U32 *pixel;
-  
-  if (x > back_buffer->width || x < 0) return;
-  if (y > back_buffer->height || y < 0) return;
-  pixel = CAST(U32 *) ((CAST(U8 *) back_buffer->memory) + (y * back_buffer->stride) + (x * back_buffer->bytes_per_pixel));
-  *pixel = color; /* AARRGGBB */
-}
-
-/* TODO: Move to 'renderer' ; color struct ; make_rgb_to_float/make_hex_to_float? ; move away from pixels (meter-to-pixels, pixels-to-meters)? */
-void draw_rect(GameBackBuffer *back_buffer, F32 x, F32 y, F32 width, F32 height, F32 R, F32 G, F32 B) {
-  S32 i, j;
-  S32 start_x, start_y, end_x, end_y;
-  U32 *pixel;
-  U32 color;
-  
-  /* round to int */
-  start_x = round_f32_to_s32(x - width/2.0f);
-  start_y = round_f32_to_s32(y - height/2.0f);
-  end_x   = round_f32_to_s32(start_x + width);
-  end_y   = round_f32_to_s32(start_y + height);
-  
-  /* clip to buffer */
-  if (start_x < 0) start_x = 0;
-  if (start_x >  back_buffer->width) start_x = back_buffer->width;
-  if (start_y < 0) start_y = 0;
-  if (start_y > back_buffer->height) start_y = back_buffer->height;
-  if (end_x < 0) end_x = 0;
-  if (end_x > back_buffer->width) end_x = back_buffer->width;
-  if (end_y < 0) end_y = 0;
-  if (end_y > back_buffer->height) end_y = back_buffer->height;
-  
-  /* pack floating point color representation to int - TODO: alpha channel */
-  color = ( (round_f32_to_u32(R * 255.0f) << 16) | (round_f32_to_u32(G * 255.0f) << 8) | (round_f32_to_u32(B * 255.0f) << 0) );
-  
-  /* start drawing */
-  for (i = start_y; i < end_y; ++i) {
-    pixel = CAST(U32 *) ((CAST(U8 *) back_buffer->memory) + (i * back_buffer->stride) + (start_x * back_buffer->bytes_per_pixel));
-    for (j = start_x; j < end_x; ++j) {
-      *pixel = color;
-      pixel++;
-    }
-  }
-}
 
 /* TODO: Platform-independent: game memory, sound output, file I/O */
 GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
@@ -347,24 +303,33 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
   /* TODO: Convert hex/rgb colors to float version */
   /* NOTE: Rendering */
   {
+    GameColor color_background, color_middle_line_red, color_middle_line_white, color_player, color_opponent, color_ball;
+    
+    color_background = color_create_from_hex(0x1f1723ff);
+    color_middle_line_red = color_create_from_hex(0xb22741ff);
+    color_middle_line_white = color_create_from_hex(0xbcb0b3ff);
+    color_player = color_create_from_hex(0x4656a5ff);
+    color_opponent = color_create_from_hex(0xf5464cff);
+    color_ball = color_create_from_hex(0x3ec54bff);
+    
     /* Dirty clear background before drawing, TODO: a proper 'draw_background' */
-    draw_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, 31.0f/255.0f, 23.0f/255.0f, 35.0f/255);
+    draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, color_background);
     
     /* Arena middle line - Red: simulation not running, White: running */
     if (!state->is_level_running) {
-      draw_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, 3, CAST(F32) back_buffer->height, 178.0f/255.0f, 39.0f/255.0f, 65.0f/255.0f);
+      draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, 3, CAST(F32) back_buffer->height, color_middle_line_red);
     } else {
-      draw_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, 3, CAST(F32) back_buffer->height, 226.0f/255.0f, 226.0f/255.0f, 226.0f/255.0f);
+      draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, 3, CAST(F32) back_buffer->height, color_middle_line_white);
     }
     
     /* Player (rect) representation - TODO: change color when moving */
-    draw_rect(back_buffer, state->player.pos.x, state->player.pos.y, state->player.width, state->player.height, 70.0f/255.0f, 86.0f/255.0f, 165.0f/255.0f);
+    draw_filled_rect(back_buffer, state->player.pos.x, state->player.pos.y, state->player.width, state->player.height, color_player);
     
     /* Opponent (rect) representation - TODO: change color when moving */
-    draw_rect(back_buffer, state->opponent.pos.x, state->opponent.pos.y, state->opponent.width, state->opponent.height, 245.0f/255.0f, 70.0f/255.0f, 76.0f/255.0f);
+    draw_filled_rect(back_buffer, state->opponent.pos.x, state->opponent.pos.y, state->opponent.width, state->opponent.height, color_opponent);
     
     /* Ball (rect) representation - TODO: change color if it's FAST */
-    draw_rect(back_buffer, state->ball.pos.x, state->ball.pos.y, state->ball.width, state->ball.height, 62.0f/255.0f, 197.0f/255.0f, 75.0f/255.0f);
+    draw_filled_rect(back_buffer, state->ball.pos.x, state->ball.pos.y, state->ball.width, state->ball.height, color_ball);
   }
 }
 
