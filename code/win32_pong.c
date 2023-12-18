@@ -2,6 +2,7 @@
 
 /*
   -* TODO: Fibers
+-* TODO: Cleanup Win32 locals?
 */
 
 #define _UNICODE
@@ -51,13 +52,21 @@ struct Win32GameCode {
   B32 is_valid;
 };
 
-/* TODO: What about no global variables? */
-GLOBAL int global_running = FALSE;
-GLOBAL Win32BackBuffer win32_back_buffer;
-GLOBAL wchar_t global_path_to_exe_root[MAX_PATH];
-GLOBAL S32 global_show_cursor = TRUE;
-GLOBAL B32 global_is_window_topmost;
-GLOBAL B32 global_is_fullscreen;
+typedef struct Win32State Win32State;
+struct Win32State {
+  B32 is_running; /* main game loop */
+  B32 is_cursor_visible;
+  B32 is_window_topmost;
+  B32 is_fullscreen;
+  Win32BackBuffer back_buffer;
+  S32 front_buffer_xoffset;
+  S32 front_buffer_yoffset;
+  S32 front_buffer_width;
+  S32 front_buffer_height;
+  wchar_t root_path[MAX_PATH]; /* path to '.exe' root directory */
+};
+
+GLOBAL Win32State global_state;
 
 INTERNAL void win32_debug_print(wchar_t *msg, ...) {
   LOCAL wchar_t formated_msg[1024];
@@ -70,7 +79,7 @@ INTERNAL void win32_debug_print(wchar_t *msg, ...) {
 }
 
 INTERNAL void win32_build_root_path_for_file(wchar_t *full_path, S32 full_path_length, wchar_t *file_name) {
-  StringCbCopyW(full_path, full_path_length, global_path_to_exe_root);
+  StringCbCopyW(full_path, full_path_length, global_state.root_path);
   StringCbCatW(full_path, full_path_length, L"\\");
   StringCbCatW(full_path, full_path_length, file_name);
 }
@@ -125,7 +134,7 @@ INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wp
   result = 0;
   switch(msg) {
     case WM_ACTIVATEAPP: {
-      if (global_is_window_topmost) {
+      if (global_state.is_window_topmost) {
         if (wparam == TRUE) { /* if window is in focus, full alpha ON*/
           SetLayeredWindowAttributes(window, RGB(0, 0, 0), 255, LWA_ALPHA);
         } else {
@@ -135,7 +144,7 @@ INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wp
     } break;
     
     case WM_SETCURSOR: {
-      if (global_show_cursor) {
+      if (global_state.is_cursor_visible) {
         SetCursor(LoadCursor(0, IDC_ARROW));
       } else {
         SetCursor(0);
@@ -151,22 +160,25 @@ INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wp
       if (size_msg == SIZE_MAXHIDE || size_msg == SIZE_MINIMIZED) {
         break;
       }
-      if (win32_back_buffer.memory != 0) {
-        VirtualFree(win32_back_buffer.memory, 0, MEM_RELEASE);
+      if (global_state.back_buffer.memory != 0) {
+        VirtualFree(global_state.back_buffer.memory, 0, MEM_RELEASE);
       }
       /* Resize/Init back buffer */
-      win32_back_buffer.bmp_info.bmiHeader.biSize = sizeof(win32_back_buffer.bmp_info.bmiHeader);
-      win32_back_buffer.bmp_info.bmiHeader.biWidth = WIN32_BACK_BUFFER_WIDTH;
-      win32_back_buffer.width = WIN32_BACK_BUFFER_WIDTH;
-      win32_back_buffer.bmp_info.bmiHeader.biHeight = -WIN32_BACK_BUFFER_HEIGHT; /* the minus here means a top-left/top-down pixel origin */
-      win32_back_buffer.height = WIN32_BACK_BUFFER_HEIGHT;
-      win32_back_buffer.bmp_info.bmiHeader.biPlanes = 1;
-      win32_back_buffer.bmp_info.bmiHeader.biBitCount = WIN32_BACK_BUFFER_BITS_PER_PIXEL;
-      win32_back_buffer.bmp_info.bmiHeader.biCompression = BI_RGB;
+      global_state.back_buffer.bmp_info.bmiHeader.biSize = sizeof(global_state.back_buffer.bmp_info.bmiHeader);
+      global_state.back_buffer.bmp_info.bmiHeader.biWidth = WIN32_BACK_BUFFER_WIDTH;
+      global_state.back_buffer.width = WIN32_BACK_BUFFER_WIDTH;
+      global_state.back_buffer.bmp_info.bmiHeader.biHeight = -WIN32_BACK_BUFFER_HEIGHT; /* the minus here means a top-left/top-down pixel origin */
+      global_state.back_buffer.height = WIN32_BACK_BUFFER_HEIGHT;
+      global_state.back_buffer.bmp_info.bmiHeader.biPlanes = 1;
+      global_state.back_buffer.bmp_info.bmiHeader.biBitCount = WIN32_BACK_BUFFER_BITS_PER_PIXEL;
+      global_state.back_buffer.bmp_info.bmiHeader.biCompression = BI_RGB;
       back_buffer_mem_size = (WIN32_BACK_BUFFER_WIDTH * WIN32_BACK_BUFFER_HEIGHT) * WIN32_BACK_BUFFER_BYTES_PER_PIXEL;
-      win32_back_buffer.memory = VirtualAlloc(0, back_buffer_mem_size, (MEM_RESERVE | MEM_COMMIT), PAGE_READWRITE);
+      global_state.back_buffer.memory = VirtualAlloc(0, back_buffer_mem_size, (MEM_RESERVE | MEM_COMMIT), PAGE_READWRITE);
       ASSERT(back_buffer_mem_size != 0, L"Coun't allocate enough memory for the game \'back buffer\'!");
-      
+      global_state.front_buffer_width = WIN32_FRONT_BUFFER_WIDTH;
+      global_state.front_buffer_height = WIN32_FRONT_BUFFER_HEIGHT;
+      global_state.front_buffer_xoffset = 0;
+      global_state.front_buffer_yoffset = 0;
     } break;
     
     case WM_KEYDOWN:
@@ -181,7 +193,7 @@ INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wp
     } break;
     
     case WM_DESTROY: {
-      global_running = FALSE;
+      global_state.is_running = FALSE;
     } break;
     
     default: {
@@ -207,11 +219,11 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
         last_backslash_index = i;
       }
     }
-    ASSERT( ( ARRAY_COUNT(global_path_to_exe_root) == ARRAY_COUNT(path) ), L"Size of 'global_path_to_exe_root' should be the same as 'path'!");
+    ASSERT( ( ARRAY_COUNT(global_state.root_path) == ARRAY_COUNT(path) ), L"Size of 'global_path_to_exe_root' should be the same as 'path'!");
     for (i = 0; i < last_backslash_index; ++i) {
-      global_path_to_exe_root[i] = path[i];
+      global_state.root_path[i] = path[i];
     }
-    global_path_to_exe_root[i] = '\0';
+    global_state.root_path[i] = '\0';
   }
   
   window_class.cbSize = sizeof(window_class);
@@ -238,6 +250,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
     RECT rect = {0};
     
     /* @IMPORTANT: Will this work on a multi-monitor setup? Wouldn't be better to use GetDeviceCaps(...)? */
+    /* TODO: Use GetMonitorInfoW(...) - To target the monitor in which the window will spawn */
     rect.left = 0;
     rect.right = WIN32_FRONT_BUFFER_WIDTH;
     rect.top = 0;
@@ -253,8 +266,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
     ASSERT(monitor_height != 0, L"Couldn't get \'monitor_height\' using \'GetSystemMetrics(...)\'!");
     window_x = (monitor_width - window_width) / 2;
     window_y = (monitor_height - window_height) / 2;
-    global_is_window_topmost = FALSE;
-    if (global_is_window_topmost) {
+    global_state.is_window_topmost = FALSE;
+    if (global_state.is_window_topmost) {
       window = CreateWindowExW((WS_EX_TOPMOST | WS_EX_LAYERED), window_class.lpszClassName, L"Game Window", window_styles, window_x, window_y, window_width, window_height, 0, 0, instance, 0);
     } else {
       window = CreateWindowExW(0, window_class.lpszClassName, L"Game Window", window_styles, window_x, window_y, window_width, window_height, 0, 0, instance, 0);
@@ -270,10 +283,11 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
     GameInput game_input = {0};
     GameState game_state = {0};
     Win32GameCode game_code = {0};
+    /* @Cleanup: Win32 layer */
     LARGE_INTEGER current_perf_counter = {0}, last_perf_counter = {0}, perf_frequency = {0};
     U32 sleep_granularity;
     float raw_elapsed_ms, cooked_elapsed_ms;
-    float dt; /* this is actually 'last_frame_dt', in seconds */
+    float dt; /* this is actually 'last_frame_dt', in seconds - time elapsed in seconds since last frame */
     wchar_t game_dll_full_path[MAX_PATH] = {0}, game_temp_dll_full_path[MAX_PATH] = {0}, lock_pdb_full_path[MAX_PATH] = {0};
     S32 monitor_refresh_rate;
     
@@ -304,8 +318,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
     ASSERT(QueryPerformanceFrequency(&perf_frequency) != 0, L"Couldn't get processor \'performance frequency\' - \'QueryPerformanceFrequency(...)\' shouldn't return 0!"); /* this is the CPU ticks_per_second capability - TODO: maybe do some crazy shit if this fails */
     ASSERT(QueryPerformanceCounter(&last_perf_counter) != 0, L"Couldn't get processor \'performance counter\' - \'QueryPerformanceCounter(...)\' shouldn't return 0!");
     dt = 0.0f;
-    global_running = TRUE;
-    while (global_running) {
+    global_state.is_running = TRUE;
+    while (global_state.is_running) {
       /* NOTE: Reload game code, if necessary */
       {
 #if defined(WIN32_DEBUG)
@@ -372,10 +386,10 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
                   go_fullscreen = TRUE;
                 }
                 
+                /* NOTE: Toggle fullscreen */
                 if (go_fullscreen) {
                   win32_debug_print(L"Trying to go fullscreen...\n");
-                  ASSERT(!global_is_window_topmost, L"Hey, man! This can be difficult to debug, turn it off.");
-                  /* toggle fullscreen */
+                  ASSERT(!global_state.is_window_topmost, L"Hey, man! This can be difficult to debug, turn it off.");
                   {
                     LOCAL WINDOWPLACEMENT prev_window_placement = {0}; /* TODO: move to win32 state */
                     DWORD window_styles;
@@ -390,15 +404,42 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
                         SetWindowLongW(window, GWL_STYLE,( window_styles & ~(WS_OVERLAPPEDWINDOW)));
                         SetWindowPos(window, HWND_TOP, monitor_info.rcMonitor.left, monitor_info.rcMonitor.top, monitor_info.rcMonitor.right - monitor_info.rcMonitor.left,
                                      monitor_info.rcMonitor.bottom - monitor_info.rcMonitor.top, (SWP_NOOWNERZORDER | SWP_FRAMECHANGED));
-                        global_is_fullscreen = TRUE;
+                        global_state.is_fullscreen = TRUE;
+                        
+                        /* NOTE: Calc new front_buffer dimensions */
+                        {
+                          int i;
+                          S32 monitor_max_width, monitor_max_height;
+                          /* NOTE: 16:9 resolutions divisible by 8 */
+                          LOCAL S32 front_buffer_dimensions[][2] = { { 128,  72 }, { 256,  144 }, { 384,  216 }, { 512,  288 }, { 640,  360 }, { 768,  432 }, { 896,  504 }, { 1024, 576 }, { 1152, 648 }, { 1280, 720 }, { 1408, 792 }, { 1536, 864 }, { 1664, 936 }, { 1792, 1008 }, { 1920, 1080 }, { 2048, 1152 }, { 2176, 1224 }, { 2304, 1296 }, { 2432, 1368 }, { 2560, 1440 }, { 2688, 1512 }, { 2816, 1584 }, { 2944, 1656 }, { 3072, 1728 }, { 3200, 1800 }, { 3328, 1872 }, { 3456, 1944 }, { 3584, 2016 }, { 3712, 2088 }, { 3840, 2160 }, { 3968, 2232 }, { 4096, 2304 }, { 4224, 2376 }, { 4352, 2448 }, { 4480, 2520 }, { 4608, 2592 }, { 4736, 2664 }, { 4864, 2736 }, { 4992, 2808 }, { 5120, 2880 }, { 5248, 2952 }, { 5376, 3024 }, { 5504, 3096 }, { 5632, 3168 }, { 5760, 3240 }, { 5888, 3312 }, { 6016, 3384 }, { 6144, 3456 }, { 6272, 3528 }, { 6400, 3600 }, { 6528, 3672 }, { 6656, 3744 }, { 6784, 3816 }, { 6912, 3888 }, { 7040, 3960 }, { 7168, 4032 }, { 7296, 4104 }, { 7424, 4176 }, { 7552, 4248 }, { 7680, 4320 } }; /* up to 8k */
+                          
+                          monitor_max_width = monitor_info.rcMonitor.right - monitor_info.rcMonitor.left;
+                          monitor_max_height = monitor_info.rcMonitor.bottom - monitor_info.rcMonitor.top;
+                          global_state.front_buffer_width = WIN32_BACK_BUFFER_WIDTH;
+                          global_state.front_buffer_height = WIN32_BACK_BUFFER_HEIGHT;
+                          for(i = 0; i < ARRAY_COUNT(front_buffer_dimensions); ++i) {
+                            if (front_buffer_dimensions[i][0] > monitor_max_width) break;
+                            if (front_buffer_dimensions[i][1] > monitor_max_height) break;
+                            global_state.front_buffer_width = front_buffer_dimensions[i][0];
+                            global_state.front_buffer_height = front_buffer_dimensions[i][1];
+                          }
+                          /* win32_debug_print(L"front_buffer width: %d, front_buffer height: %d \n", front_buffer_width, front_buffer_height);*/
+                          global_state.front_buffer_xoffset = (monitor_max_width - global_state.front_buffer_width) / 2;
+                          global_state.front_buffer_yoffset = (monitor_max_height - global_state.front_buffer_height) / 2;
+                          /* NOTE: Should I 'PatBlit(...)' the not-drawn regions? - TODO: Yes! PatBlit will be necessary */
+                        }
                       } else {
-                        /* TODO: Let user now it failed to go fullscreen! */
+                        /* TODO: Let user know it failed to go fullscreen! */
                       }
                     } else {
                       SetWindowLongW(window, GWL_STYLE, (window_styles | WS_OVERLAPPEDWINDOW) & ~(WS_MAXIMIZEBOX | WS_SIZEBOX));
                       SetWindowPlacement(window, &prev_window_placement);
                       SetWindowPos(window, NULL, 0, 0, 0, 0, (SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED));
-                      global_is_fullscreen = FALSE;
+                      global_state.is_fullscreen = FALSE;
+                      global_state.front_buffer_width = WIN32_FRONT_BUFFER_WIDTH;
+                      global_state.front_buffer_height = WIN32_FRONT_BUFFER_HEIGHT;
+                      global_state.front_buffer_xoffset = 0;
+                      global_state.front_buffer_yoffset = 0;
                     }
                   }
                 }
@@ -437,7 +478,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
                 
                 is_alt_pressed = (window_msg.lParam & (1 << 29)) != 0;
                 if (is_alt_pressed) {
-                  global_running = FALSE;
+                  global_state.is_running = FALSE;
                 };
               } break;
             }
@@ -457,52 +498,20 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
         LOCAL int release_dc_result;
         HDC window_dc;
         
-        game_back_buffer.width = win32_back_buffer.width;
-        game_back_buffer.height = win32_back_buffer.height;
+        game_back_buffer.width = global_state.back_buffer.width;
+        game_back_buffer.height = global_state.back_buffer.height;
         game_back_buffer.bytes_per_pixel = WIN32_BACK_BUFFER_BYTES_PER_PIXEL;
         game_back_buffer.stride = game_back_buffer.width * game_back_buffer.bytes_per_pixel;
-        game_back_buffer.memory = win32_back_buffer.memory;
+        game_back_buffer.memory = global_state.back_buffer.memory;
         game_input.dt = dt;
         game_code.update_and_render(&game_back_buffer, &game_input, &game_state);
         
         /* Display the 'back_buffer' in window */
         {
-          S32 front_buffer_width, front_buffer_height;
-          S32 front_buffer_xoffset, front_buffer_yoffset;
-          
-          front_buffer_width = WIN32_FRONT_BUFFER_WIDTH;
-          front_buffer_height = WIN32_FRONT_BUFFER_HEIGHT;
-          front_buffer_xoffset = front_buffer_yoffset = 0;
-          /* TODO: Store this only once, when user toggle fullscreen, in 'win32_state' */
-          if (global_is_fullscreen) {
-            int i;
-            S32 monitor_max_width, monitor_max_height;
-            MONITORINFO monitor_info = {0};
-            /* NOTE: 16:9 resolutions divisible by 8 */
-            LOCAL S32 front_buffer_dimensions[][2] = { { 128,  72 }, { 256,  144 }, { 384,  216 }, { 512,  288 }, { 640,  360 }, { 768,  432 }, { 896,  504 }, { 1024, 576 }, { 1152, 648 }, { 1280, 720 }, { 1408, 792 }, { 1536, 864 }, { 1664, 936 }, { 1792, 1008 }, { 1920, 1080 }, { 2048, 1152 }, { 2176, 1224 }, { 2304, 1296 }, { 2432, 1368 }, { 2560, 1440 }, { 2688, 1512 }, { 2816, 1584 }, { 2944, 1656 }, { 3072, 1728 }, { 3200, 1800 }, { 3328, 1872 }, { 3456, 1944 }, { 3584, 2016 }, { 3712, 2088 }, { 3840, 2160 }, { 3968, 2232 }, { 4096, 2304 }, { 4224, 2376 }, { 4352, 2448 }, { 4480, 2520 }, { 4608, 2592 }, { 4736, 2664 }, { 4864, 2736 }, { 4992, 2808 }, { 5120, 2880 }, { 5248, 2952 }, { 5376, 3024 }, { 5504, 3096 }, { 5632, 3168 }, { 5760, 3240 }, { 5888, 3312 }, { 6016, 3384 }, { 6144, 3456 }, { 6272, 3528 }, { 6400, 3600 }, { 6528, 3672 }, { 6656, 3744 }, { 6784, 3816 }, { 6912, 3888 }, { 7040, 3960 }, { 7168, 4032 }, { 7296, 4104 }, { 7424, 4176 }, { 7552, 4248 }, { 7680, 4320 } }; /* up to 8k */
-            
-            monitor_info.cbSize = sizeof(monitor_info);
-            GetMonitorInfoW(MonitorFromWindow(window, MONITOR_DEFAULTTOPRIMARY), &monitor_info);
-            monitor_max_width = monitor_info.rcMonitor.right - monitor_info.rcMonitor.left;
-            monitor_max_height = monitor_info.rcMonitor.bottom - monitor_info.rcMonitor.top;
-            front_buffer_width = WIN32_BACK_BUFFER_WIDTH;
-            front_buffer_height = WIN32_BACK_BUFFER_HEIGHT;
-            for(i = 0; i < ARRAY_COUNT(front_buffer_dimensions); ++i) {
-              if (front_buffer_dimensions[i][0] > monitor_max_width) break;
-              if (front_buffer_dimensions[i][1] > monitor_max_height) break;
-              front_buffer_width = front_buffer_dimensions[i][0];
-              front_buffer_height = front_buffer_dimensions[i][1];
-            }
-            /* win32_debug_print(L"front_buffer width: %d, front_buffer height: %d \n", front_buffer_width, front_buffer_height);*/
-            front_buffer_xoffset = (monitor_max_width - front_buffer_width) / 2;
-            front_buffer_yoffset = (monitor_max_height - front_buffer_height) / 2;
-            /* NOTE: Should I 'PatBlit(...)' the not-drawn regions? - TODO: Yes! PatBlit will be necessary */
-          }
-          
           window_dc = GetDC(window); /* NOTE: Maybe this isn't necessary at all, since I'll do the rendering myself, I don't really need to release the DC everyframe. */
           /*ASSERT(window_dc != 0);*/
           /* NOTE: BitBlt is faster than SctretchDIBits, maybe, in the future, change to BitBlt and do a bitmap resize by hand for the 'front buffer'? */
-          StretchDIBits(window_dc, front_buffer_xoffset, front_buffer_yoffset, front_buffer_width, front_buffer_height, 0, 0, game_back_buffer.width, game_back_buffer.height, game_back_buffer.memory, &win32_back_buffer.bmp_info, DIB_RGB_COLORS, SRCCOPY);
+          StretchDIBits(window_dc, global_state.front_buffer_xoffset, global_state.front_buffer_yoffset, global_state.front_buffer_width, global_state.front_buffer_height, 0, 0, game_back_buffer.width, game_back_buffer.height, game_back_buffer.memory, &global_state.back_buffer.bmp_info, DIB_RGB_COLORS, SRCCOPY);
           if (window_dc != 0) { /* This check exist's because when the window minimized this is 0 */
             release_dc_result = ReleaseDC(window, window_dc);
             ASSERT(release_dc_result != 0, L"Windows failed to release the main window device context!");

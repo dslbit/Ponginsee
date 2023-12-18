@@ -300,7 +300,6 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
     }
   }
   
-  /* TODO: Convert hex/rgb colors to float version */
   /* NOTE: Rendering */
   {
     GameColor color_background, color_middle_line_red, color_middle_line_white, color_player, color_opponent, color_ball;
