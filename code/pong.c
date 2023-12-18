@@ -94,7 +94,7 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
   if (state->is_level_running) {
     /* NOTE: Player movement code */
     {
-      Player *player;
+      Entity *player;
       
       player = &state->player;
       v2_zero(&player->acc);
@@ -113,7 +113,7 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
     
     /* NOTE: Opponent movement code */
     {
-      Opponent *opponent;
+      Entity *opponent;
       
       opponent = &state->opponent;
       v2_zero(&opponent->acc);
@@ -145,7 +145,7 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
     
     /* NOTE: Ball movement code - TODO: Remember to clamp ball velocity < 'player_width' */
     {
-      Ball *ball;
+      Entity *ball;
       
       ball = &state->ball;
       v2_zero(&ball->acc);
@@ -217,7 +217,7 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
       
       /* Ball VS Arena collision */
       {
-        Ball *ball;
+        Entity *ball;
         S32 ball_hit_point_top, ball_hit_point_bottom, ball_hit_point_left, ball_hit_point_right;
         
         ball = &state->ball;
@@ -252,8 +252,8 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
       
       /* Ball VS Player collision */
       {
-        Player *player;
-        Ball *ball;
+        Entity *player;
+        Entity *ball;
         S32 player_hit_point_top, player_hit_point_bottom, player_hit_point_left, player_hit_point_right;
         S32 ball_hit_point_top, ball_hit_point_bottom, ball_hit_point_left, ball_hit_point_right;
         B32 is_colliding;
@@ -300,8 +300,8 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
     
     /* Ball VS Opponent collision */
     {
-      Opponent *opponent;
-      Ball *ball;
+      Entity *opponent;
+      Entity *ball;
       S32 opponent_hit_point_top, opponent_hit_point_bottom, opponent_hit_point_left, opponent_hit_point_right;
       S32 ball_hit_point_top, ball_hit_point_bottom, ball_hit_point_left, ball_hit_point_right;
       B32 is_colliding;

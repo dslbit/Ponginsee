@@ -40,48 +40,26 @@ struct GameInput {
   GameControllerInput player1;
 };
 
-/* TODO: Base entity type? */
-typedef struct Player Player;
-struct Player {
+typedef struct Entity Entity;
+struct Entity {
   V2 pos;
   V2 vel;
   V2 acc;
   
-  /* This is used for collision and drawing */
+  /* NOTE: For now everything will be recty - This is used for collision and rendering */
   F32 width;
   F32 height;
 };
 
-typedef struct Ball Ball;
-struct Ball {
-  V2 pos;
-  V2 vel;
-  V2 acc;
-  
-  /* This is used for collision and drawing */
-  F32 width;
-  F32 height;
-};
-
-typedef struct Opponent Opponent;
-struct Opponent {
-  V2 pos;
-  V2 vel;
-  V2 acc;
-  
-  /* This is used for collision and drawing */
-  F32 width;
-  F32 height;
-};
 
 typedef struct GameState GameState;
 struct GameState {
   B32 initialized;
   
   B32 is_level_running;
-  Player player;
-  Opponent opponent;
-  Ball ball;
+  Entity player;
+  Entity opponent;
+  Entity ball;
 };
 
 #define GAME_UPDATE_AND_RENDER_PROTOTYPE(_name) void _name(GameBackBuffer *back_buffer, GameInput *input, GameState *state)
