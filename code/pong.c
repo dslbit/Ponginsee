@@ -36,6 +36,7 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
   
   if (!state->is_level_running && input->player1.start.released) {
     state->is_level_running = TRUE;
+    state->is_winner_time = FALSE;
     
     /* NOTE: Reset some variables to start the new round */
     state->player.pos.y = (CAST(F32) back_buffer->height) / 2.0f;
@@ -80,7 +81,7 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
       opponent = &state->opponent;
       v2_zero(&opponent->acc);
       
-#if 0
+#if 1
       /* NOTE: For now, opponent movement code makes the opponent almost invincible */
       if ( (state->ball.vel.y < 0) && (state->ball.pos.y < (opponent->pos.y - opponent->height/4.0f)) ) {
         opponent->acc.y = -1.0f;
@@ -89,9 +90,9 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
       }
       
       if ( (ABS(state->ball.pos.y - opponent->pos.y) > opponent->height * 1.5f) ) {
-        opponent->acc = v2_mul(opponent->acc, 10500.0f);
+        opponent->acc = v2_mul(opponent->acc, 3500.0f); /* hard: 10500 */
       } else {
-        opponent->acc = v2_mul(opponent->acc, 4500.0f);
+        opponent->acc = v2_mul(opponent->acc, 1500.0f); /* hard: 4500, */
       }
       
       opponent->vel = v2_add(opponent->vel, v2_mul(opponent->acc, input->dt));
@@ -101,8 +102,9 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
       
       opponent->width = 12 - ABS(opponent->vel.y * 0.00159f);
       opponent->height = 70 + ABS(opponent->vel.y * 0.05f);
-#endif
+#else
       opponent->pos.y = state->ball.pos.y;
+#endif
     }
     
     /* NOTE: Ball movement code - TODO: Remember to clamp ball velocity < 'player_width' */
@@ -253,7 +255,7 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
           }
           
           ball->vel.y = ball_y_direction * ABS(ball->vel.y);
-          ball->vel = v2_mul(ball->vel, CLAMP(player->vel.y * 0.5f, 1.5f, 2.0f));
+          ball->vel = v2_mul(ball->vel, CLAMP(player->vel.y * 0.75f, 1.5f, 2.0f));
           ball->pos.x = (player->pos.x + player->width/2.0f) + (ball->width/2.0f) + 1;
           ball->vel.x *= -1;
         }
@@ -304,6 +306,18 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
         ball->vel.x *= -1;
       }
     }
+    
+    /* NOTE: Checking for winner */
+    {
+      /* TODO: Just copy collor from winner, no need to hard-code this - also no need to hard-code 'player_max_score' */
+      if (state->player.player_data.score == 3) {
+        state->color_winner = color_create_from_hex(0x4656a5ff);
+        state->is_winner_time = TRUE;
+      } else if (state->opponent.player_data.score == 3) {
+        state->color_winner = color_create_from_hex(0xf5464cff);
+        state->is_winner_time = TRUE;
+      }
+    }
   }
   
   /* NOTE: Rendering */
@@ -317,26 +331,80 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
     color_opponent = color_create_from_hex(0xf5464cff);
     color_ball = color_create_from_hex(0x3ec54bff);
     
-    /* Dirty clear background before drawing, TODO: a proper 'draw_background' */
-    draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, color_background);
-    
-    /* Arena middle line - Red: simulation not running, White: running */
-    if (!state->is_level_running) {
-      draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, 3, CAST(F32) back_buffer->height, color_middle_line_red);
+    if (state->is_winner_time) {
+      F32 winner_rect_x, winner_rect_y, winner_rect_width, winner_rect_height;
+      
+      state->player.player_data.score = 0;
+      state->opponent.player_data.score = 0;
+      state->is_level_running = FALSE;
+      draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, color_background);
+      winner_rect_width = back_buffer->width/3.0f;
+      winner_rect_height = back_buffer->width/3.0f;
+      winner_rect_x = back_buffer->width / 2.0f;
+      winner_rect_y = back_buffer->height / 2.0f;
+      draw_filled_rect(back_buffer, winner_rect_x, winner_rect_y, winner_rect_width, winner_rect_height, state->color_winner);
     } else {
-      draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, 3, CAST(F32) back_buffer->height, color_middle_line_white);
+      /* Dirty clear background before drawing, TODO: a proper 'draw_background' */
+      draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, color_background);
+      
+      /* Arena middle line - Red: simulation not running, White: running */
+#define ARENA_MIDDLE_LINE_WIDTH 3
+      if (!state->is_level_running) {
+        draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, ARENA_MIDDLE_LINE_WIDTH, CAST(F32) back_buffer->height, color_middle_line_red);
+      } else {
+        draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, ARENA_MIDDLE_LINE_WIDTH, CAST(F32) back_buffer->height, color_middle_line_white);
+      }
+      
+      /* NOTE: Drawing players' score - represented as rects, top-centered to the player side */
+      {
+        S32 score_count, player_score, opponent_score;
+        F32 yoffset, xoffset, xpadding, ypadding;
+        F32 score_rect_x, score_rect_y, score_rect_width, score_rect_height;
+        
+        /* Player' score */
+        score_rect_width = 9;
+        score_rect_height = 9;
+        xpadding = 5;
+        ypadding = 3;
+        xoffset = (back_buffer->width / 2.0f) - ARENA_MIDDLE_LINE_WIDTH - score_rect_width/2.0f - xpadding;
+        yoffset = score_rect_height;
+        player_score = state->player.player_data.score;
+        for (score_count = 1; score_count <= player_score; ++score_count) {
+          score_rect_x = xoffset;
+          score_rect_y = yoffset;
+          xoffset -= score_rect_width + xpadding;
+          if ( (score_count != 0) && (score_count % 10 == 0) ) {
+            yoffset += score_rect_height + ypadding;
+            xoffset = (back_buffer->width / 2.0f) - ARENA_MIDDLE_LINE_WIDTH - score_rect_width/2.0f - xpadding;
+          }
+          draw_filled_rect(back_buffer, score_rect_x, score_rect_y, score_rect_width, score_rect_height, color_player);
+        }
+        
+        /* Opponent' score */
+        xoffset = (back_buffer->width / 2.0f) + ARENA_MIDDLE_LINE_WIDTH + score_rect_width/2.0f + xpadding;
+        yoffset = score_rect_height;
+        opponent_score = state->opponent.player_data.score;
+        for (score_count = 1; score_count <= opponent_score; ++score_count) {
+          score_rect_x = xoffset;
+          score_rect_y = yoffset;
+          xoffset += score_rect_width + xpadding;
+          if ( (score_count != 0) && (score_count % 10 == 0) ) {
+            yoffset += score_rect_height + ypadding;
+            xoffset = (back_buffer->width / 2.0f) + ARENA_MIDDLE_LINE_WIDTH + score_rect_width/2.0f + xpadding;
+          }
+          draw_filled_rect(back_buffer, score_rect_x, score_rect_y, score_rect_width, score_rect_height, color_opponent);
+        }
+      }
+      
+      /* Player (rect) representation - TODO: change color when moving */
+      draw_filled_rect(back_buffer, state->player.pos.x, state->player.pos.y, state->player.width, state->player.height, color_player);
+      
+      /* Opponent (rect) representation - TODO: change color when moving */
+      draw_filled_rect(back_buffer, state->opponent.pos.x, state->opponent.pos.y, state->opponent.width, state->opponent.height, color_opponent);
+      
+      /* Ball (rect) representation - TODO: change color if it's FAST */
+      draw_filled_rect(back_buffer, state->ball.pos.x, state->ball.pos.y, state->ball.width, state->ball.height, color_ball);
     }
-    
-    /* TODO: Draw players' score */
-    
-    /* Player (rect) representation - TODO: change color when moving */
-    draw_filled_rect(back_buffer, state->player.pos.x, state->player.pos.y, state->player.width, state->player.height, color_player);
-    
-    /* Opponent (rect) representation - TODO: change color when moving */
-    draw_filled_rect(back_buffer, state->opponent.pos.x, state->opponent.pos.y, state->opponent.width, state->opponent.height, color_opponent);
-    
-    /* Ball (rect) representation - TODO: change color if it's FAST */
-    draw_filled_rect(back_buffer, state->ball.pos.x, state->ball.pos.y, state->ball.width, state->ball.height, color_ball);
   }
 }
 

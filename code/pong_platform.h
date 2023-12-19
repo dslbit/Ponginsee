@@ -74,6 +74,9 @@ struct GameState {
   B32 initialized;
   
   B32 is_level_running;
+  B32 is_winner_time;
+  U32 max_player_score;
+  GameColor color_winner;
   Entity player;
   Entity opponent;
   Entity ball;
