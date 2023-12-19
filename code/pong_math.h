@@ -1,6 +1,8 @@
 #ifndef PONG_MATH_H
 #define PONG_MATH_H
 
+/* TODO: inline */
+
 #define SQUARE(_x) ((_x) * (_x))
 
 EXTERN_OPEN /* extern "C" { */

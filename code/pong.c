@@ -12,16 +12,22 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
     state->initialized = TRUE;
     
     state->is_level_running = FALSE;
+    
+    state->player = entity_create(ENTITY_TYPE_PLAYER);
     state->player.pos.x = 15; /* player_xoffset */
     state->player.pos.y = (CAST(F32) back_buffer->height) / 2.0f;
     state->player.width = 12;
     state->player.height = 70;
+    state->player.player_data.score = 0;
     
+    state->opponent = entity_create(ENTITY_TYPE_PLAYER);
     state->opponent.pos.x = CAST(F32) (back_buffer->width - 15);
     state->opponent.pos.y = back_buffer->height / 2.0f;
     state->opponent.width = 12;
     state->opponent.height = 70;
+    state->opponent.player_data.score = 0;
     
+    state->ball = entity_create(ENTITY_TYPE_BLANK);
     state->ball.width = state->ball.height = 9;
     state->ball.pos.x = back_buffer->width / 2.0f;
     state->ball.pos.y = back_buffer->height / 2.0f;
@@ -193,7 +199,7 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
         if (ball_hit_point_left < 0) {
           ball->pos.x = back_buffer->width/2.0f;
           ball->pos.y = back_buffer->height/2.0f;
-          /* TODO: Player score++ */
+          state->opponent.player_data.score++;
           state->is_level_running = FALSE;
         }
         
@@ -201,7 +207,7 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
         if (ball_hit_point_right > back_buffer->width) {
           ball->pos.x = back_buffer->width/2.0f;
           ball->pos.y = back_buffer->height/2.0f;
-          /* TODO: Opponent score++ */
+          state->player.player_data.score++;
           state->is_level_running = FALSE;
         }
       }
@@ -320,6 +326,8 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
     } else {
       draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, 3, CAST(F32) back_buffer->height, color_middle_line_white);
     }
+    
+    /* TODO: Draw players' score */
     
     /* Player (rect) representation - TODO: change color when moving */
     draw_filled_rect(back_buffer, state->player.pos.x, state->player.pos.y, state->player.width, state->player.height, color_player);
