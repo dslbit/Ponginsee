@@ -1,7 +1,6 @@
 #include "pong.c"
 
 /*
-  -* TODO: Fibers
 -* TODO: Cleanup Win32 locals?
 */
 
@@ -22,6 +21,8 @@ __debugbreak();\
 #else
 #define ASSERT(_exp)
 #endif /* defined(WIN32_DEBUG) */
+
+#define WIN32_ID_TIMER_MAIN_FIBER 1
 
 /* 640/360, 1280/720*/
 #define WIN32_FRONT_BUFFER_WIDTH (640)
@@ -65,6 +66,8 @@ struct Win32State {
   S32 front_buffer_height;
   wchar_t root_path[MAX_PATH]; /* path to '.exe' root directory */
   WINDOWPLACEMENT prev_window_placement;
+  HANDLE fiber_main;
+  HANDLE fiber_message;
 };
 
 GLOBAL Win32State global_state;
@@ -131,9 +134,13 @@ INTERNAL void win32_unload_game_code(Win32GameCode *game_code) {
 
 INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wparam, LPARAM lparam) {
   LRESULT result;
+  GameInput *game_input;
   
   result = 0;
+  game_input = CAST(GameInput *) GetWindowLongPtrW(window, GWLP_USERDATA);
   switch(msg) {
+    
+    /* TODO: Set lower 'target_seconds_per_frame' when app is not in focus */
     case WM_ACTIVATEAPP: {
       if (global_state.is_window_topmost) {
         if (wparam == TRUE) { /* if window is in focus, full alpha ON*/
@@ -151,6 +158,20 @@ INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wp
         SetCursor(0);
       }
       
+    } break;
+    
+    case WM_TIMER: {
+      SwitchToFiber(global_state.fiber_main);
+    } break;
+    
+    case WM_ENTERMENULOOP:
+    case WM_ENTERSIZEMOVE: {
+      SetTimer(window, WIN32_ID_TIMER_MAIN_FIBER, 1, 0);
+    } break;
+    
+    case WM_EXITMENULOOP:
+    case WM_EXITSIZEMOVE: {
+      KillTimer(window, WIN32_ID_TIMER_MAIN_FIBER);
     } break;
     
     case WM_SIZE: {
@@ -186,7 +207,146 @@ INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wp
     case WM_KEYUP:
     case WM_SYSKEYDOWN:
     case WM_SYSKEYUP: {
-      ASSERT(0, L"Keyboard input shoudn't go though here!");
+      DWORD key;
+      S32 is_down, was_down, pressed, released;
+      
+      if (game_input == 0) {
+        break;
+      }
+      
+      key = CAST(DWORD) wparam;
+      was_down = ( (lparam & (1 << 30)) != 0 ); /* NOTE: Yes, Douglas, if it's not zero, not necessarily it needs to be 1, it can be different than 1. */
+      is_down = ( (lparam & (1 << 31)) == 0 );
+      pressed = is_down;
+      released = (was_down && !is_down) ? TRUE : FALSE;
+      
+      switch (key) {
+        /* NOTE: This will also be used as the 'start' button for the game (VK_RETURN). */
+        case VK_F11:
+        case VK_RETURN:{
+          B32 is_alt_pressed;
+          B32 go_fullscreen;
+          
+          is_alt_pressed = (lparam & (1 << 29)) != 0;
+          go_fullscreen = FALSE;
+          if (key == VK_RETURN && is_alt_pressed == FALSE) {
+            game_input->player1.start.pressed = pressed;
+            game_input->player1.start.released = released;
+          } else if (key == VK_F11 && released) {
+            go_fullscreen = TRUE;
+          } else if (key == VK_RETURN && released && is_alt_pressed) {
+            go_fullscreen = TRUE;
+          }
+          
+          /* NOTE: Toggle fullscreen */
+          if (go_fullscreen) {
+            win32_debug_print(L"Trying to go fullscreen...\n");
+            ASSERT(!global_state.is_window_topmost, L"Hey, man! This can be difficult to debug, turn it off.");
+            {
+              DWORD window_styles;
+              
+              global_state.prev_window_placement.length = sizeof(global_state.prev_window_placement);
+              window_styles = GetWindowLongW(window, GWL_STYLE);
+              if (window_styles & WS_OVERLAPPEDWINDOW) {
+                MONITORINFO monitor_info = {0};
+                
+                monitor_info.cbSize = sizeof(monitor_info);
+                if ( (GetWindowPlacement(window, &global_state.prev_window_placement) && (GetMonitorInfoW(MonitorFromWindow(window, MONITOR_DEFAULTTOPRIMARY), &monitor_info))) ) {
+                  SetWindowLongW(window, GWL_STYLE,( window_styles & ~(WS_OVERLAPPEDWINDOW)));
+                  SetWindowPos(window, HWND_TOP, monitor_info.rcMonitor.left, monitor_info.rcMonitor.top, monitor_info.rcMonitor.right - monitor_info.rcMonitor.left,
+                               monitor_info.rcMonitor.bottom - monitor_info.rcMonitor.top, (SWP_NOOWNERZORDER | SWP_FRAMECHANGED));
+                  global_state.is_fullscreen = TRUE;
+                  
+                  /* NOTE: Calc new front_buffer dimensions */
+                  {
+                    int i;
+                    S32 monitor_max_width, monitor_max_height;
+                    HDC window_dc;
+                    /* NOTE: 16:9 resolutions divisible by 8 */
+                    LOCAL S32 front_buffer_dimensions[][2] = { { 128,  72 }, { 256,  144 }, { 384,  216 }, { 512,  288 }, { 640,  360 }, { 768,  432 }, { 896,  504 }, { 1024, 576 }, { 1152, 648 }, { 1280, 720 }, { 1408, 792 }, { 1536, 864 }, { 1664, 936 }, { 1792, 1008 }, { 1920, 1080 }, { 2048, 1152 }, { 2176, 1224 }, { 2304, 1296 }, { 2432, 1368 }, { 2560, 1440 }, { 2688, 1512 }, { 2816, 1584 }, { 2944, 1656 }, { 3072, 1728 }, { 3200, 1800 }, { 3328, 1872 }, { 3456, 1944 }, { 3584, 2016 }, { 3712, 2088 }, { 3840, 2160 }, { 3968, 2232 }, { 4096, 2304 }, { 4224, 2376 }, { 4352, 2448 }, { 4480, 2520 }, { 4608, 2592 }, { 4736, 2664 }, { 4864, 2736 }, { 4992, 2808 }, { 5120, 2880 }, { 5248, 2952 }, { 5376, 3024 }, { 5504, 3096 }, { 5632, 3168 }, { 5760, 3240 }, { 5888, 3312 }, { 6016, 3384 }, { 6144, 3456 }, { 6272, 3528 }, { 6400, 3600 }, { 6528, 3672 }, { 6656, 3744 }, { 6784, 3816 }, { 6912, 3888 }, { 7040, 3960 }, { 7168, 4032 }, { 7296, 4104 }, { 7424, 4176 }, { 7552, 4248 }, { 7680, 4320 } }; /* up to 8k */
+                    
+                    monitor_max_width = monitor_info.rcMonitor.right - monitor_info.rcMonitor.left;
+                    monitor_max_height = monitor_info.rcMonitor.bottom - monitor_info.rcMonitor.top;
+                    global_state.front_buffer_width = WIN32_BACK_BUFFER_WIDTH;
+                    global_state.front_buffer_height = WIN32_BACK_BUFFER_HEIGHT;
+                    for(i = 0; i < ARRAY_COUNT(front_buffer_dimensions); ++i) {
+                      if (front_buffer_dimensions[i][0] > monitor_max_width) break;
+                      if (front_buffer_dimensions[i][1] > monitor_max_height) break;
+                      global_state.front_buffer_width = front_buffer_dimensions[i][0];
+                      global_state.front_buffer_height = front_buffer_dimensions[i][1];
+                    }
+                    /* win32_debug_print(L"front_buffer width: %d, front_buffer height: %d \n", front_buffer_width, front_buffer_height);*/
+                    global_state.front_buffer_xoffset = (monitor_max_width - global_state.front_buffer_width) / 2;
+                    global_state.front_buffer_yoffset = (monitor_max_height - global_state.front_buffer_height) / 2;
+                    /* NOTE: It will only use PatBlt if 'front_buffer' has an xoffset or yoffset - @IMPORTANT: Is this necessary every frame or only when going fullscreen? */
+                    if (global_state.front_buffer_xoffset > 0 || global_state.front_buffer_yoffset > 0) {
+                      window_dc = GetDC(window);
+                      /* top */
+                      PatBlt(window_dc, 0, 0, monitor_max_width, global_state.front_buffer_yoffset, BLACKNESS); 
+                      /* bottom */
+                      PatBlt(window_dc, 0, monitor_max_height - global_state.front_buffer_yoffset, monitor_max_width, monitor_max_height - global_state.front_buffer_yoffset - 1, BLACKNESS); 
+                      /* left */
+                      PatBlt(window_dc, 0, 0, global_state.front_buffer_xoffset, monitor_max_height, BLACKNESS);
+                      /* right */
+                      PatBlt(window_dc, monitor_max_width - global_state.front_buffer_xoffset, 0, monitor_max_width - global_state.front_buffer_xoffset - 1, monitor_max_height, BLACKNESS);
+                      ReleaseDC(window, window_dc);
+                    }
+                  }
+                } else {
+                  /* TODO: Let user know it failed to go fullscreen! - Maybe a notification-area msg? */
+                }
+              } else {
+                SetWindowLongW(window, GWL_STYLE, (window_styles | WS_OVERLAPPEDWINDOW) & ~(WS_MAXIMIZEBOX | WS_SIZEBOX));
+                SetWindowPlacement(window, &global_state.prev_window_placement);
+                SetWindowPos(window, NULL, 0, 0, 0, 0, (SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED));
+                global_state.is_fullscreen = FALSE;
+                global_state.front_buffer_width = WIN32_FRONT_BUFFER_WIDTH;
+                global_state.front_buffer_height = WIN32_FRONT_BUFFER_HEIGHT;
+                global_state.front_buffer_xoffset = 0;
+                global_state.front_buffer_yoffset = 0;
+              }
+            }
+          }
+        } break;
+        
+        case VK_ESCAPE: {
+          
+        } break;
+        
+        case VK_UP:
+        case 'W': {
+          game_input->player1.up.pressed = pressed;
+          game_input->player1.up.released = released;
+        } break;
+        
+        case VK_DOWN:
+        case 'S': {
+          game_input->player1.down.pressed = pressed;
+          game_input->player1.down.released = released;
+        } break;
+        
+        case VK_LEFT:
+        case 'A': {
+          game_input->player1.left.pressed = pressed;
+          game_input->player1.left.released = released;
+        } break;
+        
+        case VK_RIGHT:
+        case 'D': {
+          game_input->player1.right.pressed = pressed;
+          game_input->player1.right.released = released;
+        } break;
+        
+        case VK_F4: {
+          B32 is_alt_pressed;
+          
+          is_alt_pressed = (lparam & (1 << 29)) != 0;
+          if (is_alt_pressed) {
+            global_state.is_running = FALSE;
+          };
+        } break;
+      }
+      
     } break;
     
     case WM_CLOSE: {
@@ -204,9 +364,29 @@ INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wp
   return result;
 }
 
+INTERNAL void CALLBACK win32_fiber_message(void) {
+  LOCAL MSG msg;
+  
+  for (;;) {
+    while (PeekMessageW(&msg, 0, 0, 0, PM_REMOVE)) {
+      TranslateMessage(&msg);
+      DispatchMessageW(&msg);
+    }
+    SwitchToFiber(global_state.fiber_main);
+  }
+}
+
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line, int cmd_show) {
   WNDCLASSEXW window_class = {0};
   HWND window;
+  
+  global_state.is_cursor_visible = TRUE;
+  
+  /* */
+  global_state.fiber_main = ConvertThreadToFiber(0);
+  ASSERT(global_state.fiber_main != 0, L"Hey, no 'fiber_main'? No main loop.");
+  global_state.fiber_message = CreateFiber(0, CAST(LPFIBER_START_ROUTINE) win32_fiber_message, 0);
+  ASSERT(global_state.fiber_message != 0, L"Hey, no 'fiber_message'? No message loop.");
   
   /* Getting the executable file path */
   {
@@ -254,7 +434,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
     rect.right = WIN32_FRONT_BUFFER_WIDTH;
     rect.top = 0;
     rect.bottom = WIN32_FRONT_BUFFER_HEIGHT;
-    window_styles = (WS_OVERLAPPEDWINDOW | WS_VISIBLE);
+    window_styles = (WS_VISIBLE);
     error_result = AdjustWindowRect(&rect, window_styles, FALSE);
     ASSERT(error_result != 0, L"Couldn't \'AdjustWindowRect(...)\' for the main window!");
     window_width = rect.right - rect.left;
@@ -272,7 +452,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
       window = CreateWindowExW(0, window_class.lpszClassName, L"Game Window", window_styles, window_x, window_y, window_width, window_height, 0, 0, instance, 0);
     }
     ASSERT(window != 0, L"Invalid main window handle - Window couldn't be created by Windows!");
-    SetWindowLongW(window, GWL_STYLE, GetWindowLongW(window, GWL_STYLE) & ~(WS_MAXIMIZEBOX | WS_SIZEBOX));
+    SetWindowLongW(window, GWL_STYLE, GetWindowLongW(window, GWL_STYLE) & ~(WS_CAPTION));
   }
   
   /* Game window message loop */
@@ -289,6 +469,9 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
     float dt; /* this is actually 'last_frame_dt', in seconds - time elapsed in seconds since last frame */
     wchar_t game_dll_full_path[MAX_PATH] = {0}, game_temp_dll_full_path[MAX_PATH] = {0}, lock_pdb_full_path[MAX_PATH] = {0};
     S32 monitor_refresh_rate;
+    
+    /* Pass 'game_input' to main window callback */
+    SetWindowLongPtrW(window, GWLP_USERDATA, CAST(LONG_PTR) &game_input);
     
     /* Get the monitor refresh rate */
     {
@@ -351,150 +534,13 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
         }
       }
       
+      /* NOTE: Input - This is needed in order for the order of execution of fibers to work */
+      SwitchToFiber(global_state.fiber_message);
+      
       /* NOTE: Input */
       while (PeekMessageW(&window_msg, 0, 0, 0, PM_REMOVE)) {
         switch (window_msg.message) {
-          case WM_KEYDOWN:
-          case WM_KEYUP:
-          case WM_SYSKEYDOWN:
-          case WM_SYSKEYUP: {
-            DWORD key;
-            S32 is_down, was_down, pressed, released;
-            
-            key = CAST(DWORD) window_msg.wParam;
-            was_down = ( (window_msg.lParam & (1 << 30)) != 0 ); /* NOTE: Yes, Douglas, if it's not zero, not necessarily it needs to be 1, it can be different than 1. */
-            is_down = ( (window_msg.lParam & (1 << 31)) == 0 );
-            pressed = is_down;
-            released = (was_down && !is_down) ? TRUE : FALSE;
-            
-            switch (key) {
-              /* NOTE: This will also be used as the 'start' button for the game (VK_RETURN). */
-              case VK_F11:
-              case VK_RETURN:{
-                B32 is_alt_pressed;
-                B32 go_fullscreen;
-                
-                is_alt_pressed = (window_msg.lParam & (1 << 29)) != 0;
-                go_fullscreen = FALSE;
-                if (key == VK_RETURN && is_alt_pressed == FALSE) {
-                  game_input.player1.start.pressed = pressed;
-                  game_input.player1.start.released = released;
-                } else if (key == VK_F11 && released) {
-                  go_fullscreen = TRUE;
-                } else if (key == VK_RETURN && released && is_alt_pressed) {
-                  go_fullscreen = TRUE;
-                }
-                
-                /* NOTE: Toggle fullscreen */
-                if (go_fullscreen) {
-                  win32_debug_print(L"Trying to go fullscreen...\n");
-                  ASSERT(!global_state.is_window_topmost, L"Hey, man! This can be difficult to debug, turn it off.");
-                  {
-                    DWORD window_styles;
-                    
-                    global_state.prev_window_placement.length = sizeof(global_state.prev_window_placement);
-                    window_styles = GetWindowLongW(window, GWL_STYLE);
-                    if (window_styles & WS_OVERLAPPEDWINDOW) {
-                      MONITORINFO monitor_info = {0};
-                      
-                      monitor_info.cbSize = sizeof(monitor_info);
-                      if ( (GetWindowPlacement(window, &global_state.prev_window_placement) && (GetMonitorInfoW(MonitorFromWindow(window, MONITOR_DEFAULTTOPRIMARY), &monitor_info))) ) {
-                        SetWindowLongW(window, GWL_STYLE,( window_styles & ~(WS_OVERLAPPEDWINDOW)));
-                        SetWindowPos(window, HWND_TOP, monitor_info.rcMonitor.left, monitor_info.rcMonitor.top, monitor_info.rcMonitor.right - monitor_info.rcMonitor.left,
-                                     monitor_info.rcMonitor.bottom - monitor_info.rcMonitor.top, (SWP_NOOWNERZORDER | SWP_FRAMECHANGED));
-                        global_state.is_fullscreen = TRUE;
-                        
-                        /* NOTE: Calc new front_buffer dimensions */
-                        {
-                          int i;
-                          S32 monitor_max_width, monitor_max_height;
-                          HDC window_dc;
-                          /* NOTE: 16:9 resolutions divisible by 8 */
-                          LOCAL S32 front_buffer_dimensions[][2] = { { 128,  72 }, { 256,  144 }, { 384,  216 }, { 512,  288 }, { 640,  360 }, { 768,  432 }, { 896,  504 }, { 1024, 576 }, { 1152, 648 }, { 1280, 720 }, { 1408, 792 }, { 1536, 864 }, { 1664, 936 }, { 1792, 1008 }, { 1920, 1080 }, { 2048, 1152 }, { 2176, 1224 }, { 2304, 1296 }, { 2432, 1368 }, { 2560, 1440 }, { 2688, 1512 }, { 2816, 1584 }, { 2944, 1656 }, { 3072, 1728 }, { 3200, 1800 }, { 3328, 1872 }, { 3456, 1944 }, { 3584, 2016 }, { 3712, 2088 }, { 3840, 2160 }, { 3968, 2232 }, { 4096, 2304 }, { 4224, 2376 }, { 4352, 2448 }, { 4480, 2520 }, { 4608, 2592 }, { 4736, 2664 }, { 4864, 2736 }, { 4992, 2808 }, { 5120, 2880 }, { 5248, 2952 }, { 5376, 3024 }, { 5504, 3096 }, { 5632, 3168 }, { 5760, 3240 }, { 5888, 3312 }, { 6016, 3384 }, { 6144, 3456 }, { 6272, 3528 }, { 6400, 3600 }, { 6528, 3672 }, { 6656, 3744 }, { 6784, 3816 }, { 6912, 3888 }, { 7040, 3960 }, { 7168, 4032 }, { 7296, 4104 }, { 7424, 4176 }, { 7552, 4248 }, { 7680, 4320 } }; /* up to 8k */
-                          
-                          monitor_max_width = monitor_info.rcMonitor.right - monitor_info.rcMonitor.left;
-                          monitor_max_height = monitor_info.rcMonitor.bottom - monitor_info.rcMonitor.top;
-                          global_state.front_buffer_width = WIN32_BACK_BUFFER_WIDTH;
-                          global_state.front_buffer_height = WIN32_BACK_BUFFER_HEIGHT;
-                          for(i = 0; i < ARRAY_COUNT(front_buffer_dimensions); ++i) {
-                            if (front_buffer_dimensions[i][0] > monitor_max_width) break;
-                            if (front_buffer_dimensions[i][1] > monitor_max_height) break;
-                            global_state.front_buffer_width = front_buffer_dimensions[i][0];
-                            global_state.front_buffer_height = front_buffer_dimensions[i][1];
-                          }
-                          /* win32_debug_print(L"front_buffer width: %d, front_buffer height: %d \n", front_buffer_width, front_buffer_height);*/
-                          global_state.front_buffer_xoffset = (monitor_max_width - global_state.front_buffer_width) / 2;
-                          global_state.front_buffer_yoffset = (monitor_max_height - global_state.front_buffer_height) / 2;
-                          /* NOTE: It will only use PatBlt if 'front_buffer' has an xoffset or yoffset - @IMPORTANT: Is this necessary every frame or only when going fullscreen? */
-                          if (global_state.front_buffer_xoffset > 0 || global_state.front_buffer_yoffset > 0) {
-                            window_dc = GetDC(window);
-                            /* top */
-                            PatBlt(window_dc, 0, 0, monitor_max_width, global_state.front_buffer_yoffset, BLACKNESS); 
-                            /* bottom */
-                            PatBlt(window_dc, 0, monitor_max_height - global_state.front_buffer_yoffset, monitor_max_width, monitor_max_height - global_state.front_buffer_yoffset - 1, BLACKNESS); 
-                            /* left */
-                            PatBlt(window_dc, 0, 0, global_state.front_buffer_xoffset, monitor_max_height, BLACKNESS);
-                            /* right */
-                            PatBlt(window_dc, monitor_max_width - global_state.front_buffer_xoffset, 0, monitor_max_width - global_state.front_buffer_xoffset - 1, monitor_max_height, BLACKNESS);
-                            ReleaseDC(window, window_dc);
-                          }
-                        }
-                      } else {
-                        /* TODO: Let user know it failed to go fullscreen! - Maybe a notification-area msg? */
-                      }
-                    } else {
-                      SetWindowLongW(window, GWL_STYLE, (window_styles | WS_OVERLAPPEDWINDOW) & ~(WS_MAXIMIZEBOX | WS_SIZEBOX));
-                      SetWindowPlacement(window, &global_state.prev_window_placement);
-                      SetWindowPos(window, NULL, 0, 0, 0, 0, (SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED));
-                      global_state.is_fullscreen = FALSE;
-                      global_state.front_buffer_width = WIN32_FRONT_BUFFER_WIDTH;
-                      global_state.front_buffer_height = WIN32_FRONT_BUFFER_HEIGHT;
-                      global_state.front_buffer_xoffset = 0;
-                      global_state.front_buffer_yoffset = 0;
-                    }
-                  }
-                }
-              } break;
-              
-              case VK_ESCAPE: {
-                
-              } break;
-              
-              case VK_UP:
-              case 'W': {
-                game_input.player1.up.pressed = pressed;
-                game_input.player1.up.released = released;
-              } break;
-              
-              case VK_DOWN:
-              case 'S': {
-                game_input.player1.down.pressed = pressed;
-                game_input.player1.down.released = released;
-              } break;
-              
-              case VK_LEFT:
-              case 'A': {
-                game_input.player1.left.pressed = pressed;
-                game_input.player1.left.released = released;
-              } break;
-              
-              case VK_RIGHT:
-              case 'D': {
-                game_input.player1.right.pressed = pressed;
-                game_input.player1.right.released = released;
-              } break;
-              
-              case VK_F4: {
-                B32 is_alt_pressed;
-                
-                is_alt_pressed = (window_msg.lParam & (1 << 29)) != 0;
-                if (is_alt_pressed) {
-                  global_state.is_running = FALSE;
-                };
-              } break;
-            }
-            
-          } break;
+          
           
           default: {
             TranslateMessage(&window_msg);
@@ -573,11 +619,11 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
             
             /* NOTE: Debug 'time' print in the Visual Studio debugger */
             {
-              LOCAL int print_counter = 1;
+              LOCAL int last_print_ticks = 0;
               
-              ++print_counter;
-              if (print_counter > 10) {
-                print_counter = 0;
+              if (GetTickCount() - last_print_ticks > 250) {
+                last_print_ticks = GetTickCount();
+                //win32_debug_print(L"Window [x: %d, y: %d]\n", raw_elapsed_ms, cooked_elapsed_ms);
                 win32_debug_print(L"Raw MS: %fms\tCooked MS: %fms\n", raw_elapsed_ms, cooked_elapsed_ms);
               }
             }

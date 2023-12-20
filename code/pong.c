@@ -81,7 +81,7 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
       opponent = &state->opponent;
       v2_zero(&opponent->acc);
       
-#if 1
+#if 0
       /* NOTE: For now, opponent movement code makes the opponent almost invincible */
       if ( (state->ball.vel.y < 0) && (state->ball.pos.y < (opponent->pos.y - opponent->height/4.0f)) ) {
         opponent->acc.y = -1.0f;
@@ -310,10 +310,10 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
     /* NOTE: Checking for winner */
     {
       /* TODO: Just copy collor from winner, no need to hard-code this - also no need to hard-code 'player_max_score' */
-      if (state->player.player_data.score == 3) {
+      if (state->player.player_data.score == 30) {
         state->color_winner = color_create_from_hex(0x4656a5ff);
         state->is_winner_time = TRUE;
-      } else if (state->opponent.player_data.score == 3) {
+      } else if (state->opponent.player_data.score == 30) {
         state->color_winner = color_create_from_hex(0xf5464cff);
         state->is_winner_time = TRUE;
       }
