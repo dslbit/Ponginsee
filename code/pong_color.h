@@ -12,7 +12,7 @@ struct GameColor {
   F32 a;
 };
 
-INTERNAL GameColor color_create(F32 r, F32 g, F32 b, F32 a) {
+INTERNAL INLINE GameColor color_create(F32 r, F32 g, F32 b, F32 a) {
   GameColor result;
   
   result.r = r;
@@ -23,7 +23,7 @@ INTERNAL GameColor color_create(F32 r, F32 g, F32 b, F32 a) {
 }
 
 /* NOTE: Format RR GG BB AA */
-INTERNAL GameColor color_create_from_hex(U32 color) {
+INTERNAL INLINE GameColor color_create_from_hex(U32 color) {
   GameColor result;
   
   result.r = CAST(F32) (0xFF & (color >> 24)) / 255.0f;
@@ -33,7 +33,7 @@ INTERNAL GameColor color_create_from_hex(U32 color) {
   return result;
 }
 
-INTERNAL GameColor color_create_from_rgba(U8 r, U8 g, U8 b, U8 a) {
+INTERNAL INLINE GameColor color_create_from_rgba(U8 r, U8 g, U8 b, U8 a) {
   GameColor result;
   
   result.r = CAST(F32) r / 255.0f;

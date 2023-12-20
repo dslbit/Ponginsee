@@ -15,7 +15,7 @@
 #endif
 
 #define ASSERT(_exp, _msg) if (!(_exp)) {\
-MessageBoxW(0, L"Expression: " TO_STRING(_exp) L"\n" _msg L"\n\nAt line: " TO_STRING(__LINE__) L"\n\nIn: " __FILE__, L"Assertion Failed", (MB_ICONERROR | MB_OK));\
+MessageBoxW(0, L"Expression: " STRINGIFY(_exp) L"\n" _msg L"\n\nAt line: " STRINGIFY(__LINE__) L"\n\nIn: " __FILE__, L"Assertion Failed", (MB_ICONERROR | MB_OK));\
 __debugbreak();\
 *((int *) 0) = 0;\
 }
@@ -64,6 +64,7 @@ struct Win32State {
   S32 front_buffer_width;
   S32 front_buffer_height;
   wchar_t root_path[MAX_PATH]; /* path to '.exe' root directory */
+  WINDOWPLACEMENT prev_window_placement;
 };
 
 GLOBAL Win32State global_state;
@@ -297,7 +298,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
       
       window_dc = GetDC(window);
       monitor_refresh_rate = GetDeviceCaps(window_dc, VREFRESH); /* NOTE: User's primary monitor */
-      ASSERT((monitor_refresh_rate >= 30), L"Your primary monitor is less than 30Hz, you wouldn't be able to experience the game well, so the application will be closed!"); /* TODO: Proper exit */
+      ASSERT((monitor_refresh_rate >= 30), L"Your primary monitor refresh rate is less than 30Hz, you wouldn't be able to experience the game well, so the application will be closed!");
     }
     
     win32_build_root_path_for_file(game_dll_full_path, ARRAY_COUNT(game_dll_full_path), L"pong.dll");
@@ -310,12 +311,12 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
     {
       TIMECAPS machine_timing_caps;
       
-      /* TODO: Actually this is fine if it fails, in the future just set to 1 by default, but for now I'll do this way in debug mode. */
+      /* @IMPORTANT: Actually this is fine if it fails, in the future just set to 1 by default, but for now I'll do this way in debug mode. */
       ASSERT(timeGetDevCaps(&machine_timing_caps, sizeof(machine_timing_caps)) == MMSYSERR_NOERROR, L"Couldn't get machine timing capabilities using 'timeGetDevCaps(...)'!");
       ASSERT(timeBeginPeriod(MIN(machine_timing_caps.wPeriodMin, machine_timing_caps.wPeriodMax)) == TIMERR_NOERROR, L"Couldn't set the Windows' timer resoltuion using 'timeBeginPeriod(...)'!");
       sleep_granularity = MIN(machine_timing_caps.wPeriodMin, machine_timing_caps.wPeriodMax);
     }
-    ASSERT(QueryPerformanceFrequency(&perf_frequency) != 0, L"Couldn't get processor \'performance frequency\' - \'QueryPerformanceFrequency(...)\' shouldn't return 0!"); /* this is the CPU ticks_per_second capability - TODO: maybe do some crazy shit if this fails */
+    ASSERT(QueryPerformanceFrequency(&perf_frequency) != 0, L"Couldn't get processor \'performance frequency\' - \'QueryPerformanceFrequency(...)\' shouldn't return 0!"); /* this is the CPU ticks_per_second capability - @IMPORTANT: maybe do some crazy shit if this fails */
     ASSERT(QueryPerformanceCounter(&last_perf_counter) != 0, L"Couldn't get processor \'performance counter\' - \'QueryPerformanceCounter(...)\' shouldn't return 0!");
     dt = 0.0f;
     global_state.is_running = TRUE;
@@ -391,16 +392,15 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
                   win32_debug_print(L"Trying to go fullscreen...\n");
                   ASSERT(!global_state.is_window_topmost, L"Hey, man! This can be difficult to debug, turn it off.");
                   {
-                    LOCAL WINDOWPLACEMENT prev_window_placement = {0}; /* TODO: move to win32 state */
                     DWORD window_styles;
                     
-                    prev_window_placement.length = sizeof(prev_window_placement);
+                    global_state.prev_window_placement.length = sizeof(global_state.prev_window_placement);
                     window_styles = GetWindowLongW(window, GWL_STYLE);
                     if (window_styles & WS_OVERLAPPEDWINDOW) {
                       MONITORINFO monitor_info = {0};
                       
                       monitor_info.cbSize = sizeof(monitor_info);
-                      if ( (GetWindowPlacement(window, &prev_window_placement) && (GetMonitorInfoW(MonitorFromWindow(window, MONITOR_DEFAULTTOPRIMARY), &monitor_info))) ) {
+                      if ( (GetWindowPlacement(window, &global_state.prev_window_placement) && (GetMonitorInfoW(MonitorFromWindow(window, MONITOR_DEFAULTTOPRIMARY), &monitor_info))) ) {
                         SetWindowLongW(window, GWL_STYLE,( window_styles & ~(WS_OVERLAPPEDWINDOW)));
                         SetWindowPos(window, HWND_TOP, monitor_info.rcMonitor.left, monitor_info.rcMonitor.top, monitor_info.rcMonitor.right - monitor_info.rcMonitor.left,
                                      monitor_info.rcMonitor.bottom - monitor_info.rcMonitor.top, (SWP_NOOWNERZORDER | SWP_FRAMECHANGED));
@@ -429,11 +429,11 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
                           /* NOTE: Should I 'PatBlit(...)' the not-drawn regions? - TODO: Yes! PatBlit will be necessary */
                         }
                       } else {
-                        /* TODO: Let user know it failed to go fullscreen! */
+                        /* TODO: Let user know it failed to go fullscreen! - Maybe a notification-area msg? */
                       }
                     } else {
                       SetWindowLongW(window, GWL_STYLE, (window_styles | WS_OVERLAPPEDWINDOW) & ~(WS_MAXIMIZEBOX | WS_SIZEBOX));
-                      SetWindowPlacement(window, &prev_window_placement);
+                      SetWindowPlacement(window, &global_state.prev_window_placement);
                       SetWindowPos(window, NULL, 0, 0, 0, 0, (SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED));
                       global_state.is_fullscreen = FALSE;
                       global_state.front_buffer_width = WIN32_FRONT_BUFFER_WIDTH;
@@ -524,7 +524,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
           LOCAL float elapsed_secs, elapsed_ms, elapsed_microsecs, elapsed_nanosecs = 0.0f;
           LOCAL int fps;
           
-          ASSERT(QueryPerformanceCounter(&current_perf_counter) != 0, L"Couldn't get processor \'performance counter\' - \'QueryPerformanceCounter(...)\' shouldn't return 0!"); /* TODO: Maybe do something smart here if it fails for some reason */
+          ASSERT(QueryPerformanceCounter(&current_perf_counter) != 0, L"Couldn't get processor \'performance counter\' - \'QueryPerformanceCounter(...)\' shouldn't return 0!"); /* @IMPORTANT: Maybe do something smart here if it fails for some reason */
           
           perf_counter_diff.QuadPart = current_perf_counter.QuadPart - last_perf_counter.QuadPart; /* counts elapsed */
           elapsed_secs = CAST(float) perf_counter_diff.QuadPart / CAST(float) perf_frequency.QuadPart; /* counts per second */

@@ -1,6 +1,39 @@
 #ifndef PONG_BASE_H
 #define PONG_BASE_H
 
+/* NOTE: CLANG compiler identification */
+#if defined(__clang__)
+#define COMPILER_CLANG 1
+#endif
+
+/* NOTE: MSVC compiler identification */
+#if !defined(__clang__) && defined(_MSC_VER)
+#define COMPILER_MSVC 1
+#endif
+
+/* NOTE: GCC compiler identification */
+#if !defined(__clang__) && !defined(_MSC_VER) && defined(__GNUC__)
+#define COMPILER_GCC 1
+#endif
+
+/* NOTE: Supported compiler NOT FOUND */
+#if !defined(__clang__) && !defined(_MSC_VER) && !defined(__GNUC__)
+#error A SUPPORTED COMPILER WAS NOT FOUND! SUPPORTED COMPILERS: CLANG/MSVC/GCC - Only tested on MSVC
+#endif
+
+/* NOTE: C89 inline macro only for MSVC compiler - TODO: inline macro for other compilers (when testing on them) */
+#if !defined(__cplusplus) && (__STDC_VERSION__ < 199901L)
+
+#if defined(MSVC_COMPILER)
+#define INLINE __inline
+#else
+#define INLINE
+#endif
+
+#else
+#define INLINE inline
+#endif /* !defined(__cplusplus) && (__STDC_VERSION__ < 199901L) */
+
 #define FALSE 0
 #define TRUE 1
 
@@ -8,8 +41,8 @@
 #define LOCAL static
 #define GLOBAL static
 
-#define STRINGIFY(_s) #_s
-#define TO_STRING(_x) STRINGIFY(_x)
+#define STRINGIFY_HELPER(_s) #_s
+#define STRINGIFY(_x) STRINGIFY_HELPER(_x)
 
 #define CAST(_x) (_x)
 
@@ -41,7 +74,8 @@
 
 #define ASSERT(_exp, _msg) if (!(_exp)) { *((int *) 0) = 0; }
 
-/* TODO: Types and later make it precise using compiler checks, c version checks and 'stdint.h' */
+/* Pre-defined C/C++ Macros: https://sourceforge.net/p/predef/wiki/Home/ */
+#if ( defined(__STDC__) || (__STDC_VERSION__ < 199901L) ) || ( defined(__cplusplus) && (__cplusplus < 201103L) )
 typedef signed   int        B32;
 
 typedef unsigned char       U8;
@@ -56,5 +90,23 @@ typedef signed   long long  S64;
 
 typedef float               F32;
 typedef double              F64;
+#else
+#include <stdint.h>
+
+typedef int32_t  B32;
+
+typedef uint8_t  U8;
+typedef uint16_t U16;
+typedef uint32_t U32;
+typedef uint64_t U64;
+
+typedef int8_t   S8;
+typedef int16_t  S16;
+typedef int32_t  S32;
+typedef int64_t  S64;
+
+typedef float    F32;
+typedef double   F64;
+#endif /* #if (__STDC_VERSION__ < 199901L) */
 
 #endif //PONG_BASE_H

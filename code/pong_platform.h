@@ -82,7 +82,7 @@ struct GameState {
   Entity ball;
 };
 
-INTERNAL Entity entity_create(EntityType type) {
+INTERNAL INLINE Entity entity_create(EntityType type) {
   Entity result = {0};
   
   result.entity_type = type;
