@@ -250,8 +250,6 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
     DWORD window_styles;
     RECT rect = {0};
     
-    /* @IMPORTANT: Will this work on a multi-monitor setup? Wouldn't be better to use GetDeviceCaps(...)? */
-    /* TODO: Use GetMonitorInfoW(...) - To target the monitor in which the window will spawn */
     rect.left = 0;
     rect.right = WIN32_FRONT_BUFFER_WIDTH;
     rect.top = 0;
@@ -410,6 +408,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
                         {
                           int i;
                           S32 monitor_max_width, monitor_max_height;
+                          HDC window_dc;
                           /* NOTE: 16:9 resolutions divisible by 8 */
                           LOCAL S32 front_buffer_dimensions[][2] = { { 128,  72 }, { 256,  144 }, { 384,  216 }, { 512,  288 }, { 640,  360 }, { 768,  432 }, { 896,  504 }, { 1024, 576 }, { 1152, 648 }, { 1280, 720 }, { 1408, 792 }, { 1536, 864 }, { 1664, 936 }, { 1792, 1008 }, { 1920, 1080 }, { 2048, 1152 }, { 2176, 1224 }, { 2304, 1296 }, { 2432, 1368 }, { 2560, 1440 }, { 2688, 1512 }, { 2816, 1584 }, { 2944, 1656 }, { 3072, 1728 }, { 3200, 1800 }, { 3328, 1872 }, { 3456, 1944 }, { 3584, 2016 }, { 3712, 2088 }, { 3840, 2160 }, { 3968, 2232 }, { 4096, 2304 }, { 4224, 2376 }, { 4352, 2448 }, { 4480, 2520 }, { 4608, 2592 }, { 4736, 2664 }, { 4864, 2736 }, { 4992, 2808 }, { 5120, 2880 }, { 5248, 2952 }, { 5376, 3024 }, { 5504, 3096 }, { 5632, 3168 }, { 5760, 3240 }, { 5888, 3312 }, { 6016, 3384 }, { 6144, 3456 }, { 6272, 3528 }, { 6400, 3600 }, { 6528, 3672 }, { 6656, 3744 }, { 6784, 3816 }, { 6912, 3888 }, { 7040, 3960 }, { 7168, 4032 }, { 7296, 4104 }, { 7424, 4176 }, { 7552, 4248 }, { 7680, 4320 } }; /* up to 8k */
                           
@@ -426,7 +425,19 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
                           /* win32_debug_print(L"front_buffer width: %d, front_buffer height: %d \n", front_buffer_width, front_buffer_height);*/
                           global_state.front_buffer_xoffset = (monitor_max_width - global_state.front_buffer_width) / 2;
                           global_state.front_buffer_yoffset = (monitor_max_height - global_state.front_buffer_height) / 2;
-                          /* NOTE: Should I 'PatBlit(...)' the not-drawn regions? - TODO: Yes! PatBlit will be necessary */
+                          /* NOTE: It will only use PatBlt if 'front_buffer' has an xoffset or yoffset - @IMPORTANT: Is this necessary every frame or only when going fullscreen? */
+                          if (global_state.front_buffer_xoffset > 0 || global_state.front_buffer_yoffset > 0) {
+                            window_dc = GetDC(window);
+                            /* top */
+                            PatBlt(window_dc, 0, 0, monitor_max_width, global_state.front_buffer_yoffset, BLACKNESS); 
+                            /* bottom */
+                            PatBlt(window_dc, 0, monitor_max_height - global_state.front_buffer_yoffset, monitor_max_width, monitor_max_height - global_state.front_buffer_yoffset - 1, BLACKNESS); 
+                            /* left */
+                            PatBlt(window_dc, 0, 0, global_state.front_buffer_xoffset, monitor_max_height, BLACKNESS);
+                            /* right */
+                            PatBlt(window_dc, monitor_max_width - global_state.front_buffer_xoffset, 0, monitor_max_width - global_state.front_buffer_xoffset - 1, monitor_max_height, BLACKNESS);
+                            ReleaseDC(window, window_dc);
+                          }
                         }
                       } else {
                         /* TODO: Let user know it failed to go fullscreen! - Maybe a notification-area msg? */
