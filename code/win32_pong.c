@@ -23,6 +23,8 @@ __debugbreak();\
 #endif /* defined(WIN32_DEBUG) */
 
 #define WIN32_ID_TIMER_MAIN_FIBER 1
+#define WIN32_MAIN_WINDOW_STYLES (WS_VISIBLE)
+#define WIN32_MAIN_WINDOW_REMOVED_STYLES (~(WS_CAPTION))
 
 /* 640/360, 1280/720*/
 #define WIN32_FRONT_BUFFER_WIDTH (640)
@@ -238,7 +240,7 @@ INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wp
             go_fullscreen = TRUE;
           }
           
-          /* NOTE: Toggle fullscreen */
+          /* NOTE: Toggle fullscreen - TODO: Pull out code and make a func() to start game full screen */
           if (go_fullscreen) {
             win32_debug_print(L"Trying to go fullscreen...\n");
             ASSERT(!global_state.is_window_topmost, L"Hey, man! This can be difficult to debug, turn it off.");
@@ -247,12 +249,14 @@ INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wp
               
               global_state.prev_window_placement.length = sizeof(global_state.prev_window_placement);
               window_styles = GetWindowLongW(window, GWL_STYLE);
-              if (window_styles & WS_OVERLAPPEDWINDOW) {
+              if (window_styles && !global_state.is_fullscreen) {
                 MONITORINFO monitor_info = {0};
                 
                 monitor_info.cbSize = sizeof(monitor_info);
                 if ( (GetWindowPlacement(window, &global_state.prev_window_placement) && (GetMonitorInfoW(MonitorFromWindow(window, MONITOR_DEFAULTTOPRIMARY), &monitor_info))) ) {
+#if 0
                   SetWindowLongW(window, GWL_STYLE,( window_styles & ~(WS_OVERLAPPEDWINDOW)));
+#endif
                   SetWindowPos(window, HWND_TOP, monitor_info.rcMonitor.left, monitor_info.rcMonitor.top, monitor_info.rcMonitor.right - monitor_info.rcMonitor.left,
                                monitor_info.rcMonitor.bottom - monitor_info.rcMonitor.top, (SWP_NOOWNERZORDER | SWP_FRAMECHANGED));
                   global_state.is_fullscreen = TRUE;
@@ -296,7 +300,7 @@ INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wp
                   /* TODO: Let user know it failed to go fullscreen! - Maybe a notification-area msg? */
                 }
               } else {
-                SetWindowLongW(window, GWL_STYLE, (window_styles | WS_OVERLAPPEDWINDOW) & ~(WS_MAXIMIZEBOX | WS_SIZEBOX));
+                SetWindowLongW(window, GWL_STYLE, WIN32_MAIN_WINDOW_STYLES & WIN32_MAIN_WINDOW_REMOVED_STYLES);
                 SetWindowPlacement(window, &global_state.prev_window_placement);
                 SetWindowPos(window, NULL, 0, 0, 0, 0, (SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED));
                 global_state.is_fullscreen = FALSE;
@@ -434,7 +438,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
     rect.right = WIN32_FRONT_BUFFER_WIDTH;
     rect.top = 0;
     rect.bottom = WIN32_FRONT_BUFFER_HEIGHT;
-    window_styles = (WS_VISIBLE);
+    window_styles = WIN32_MAIN_WINDOW_STYLES;
     error_result = AdjustWindowRect(&rect, window_styles, FALSE);
     ASSERT(error_result != 0, L"Couldn't \'AdjustWindowRect(...)\' for the main window!");
     window_width = rect.right - rect.left;
@@ -452,7 +456,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
       window = CreateWindowExW(0, window_class.lpszClassName, L"Game Window", window_styles, window_x, window_y, window_width, window_height, 0, 0, instance, 0);
     }
     ASSERT(window != 0, L"Invalid main window handle - Window couldn't be created by Windows!");
-    SetWindowLongW(window, GWL_STYLE, GetWindowLongW(window, GWL_STYLE) & ~(WS_CAPTION));
+    SetWindowLongW(window, GWL_STYLE, GetWindowLongW(window, GWL_STYLE) & WIN32_MAIN_WINDOW_REMOVED_STYLES);
   }
   
   /* Game window message loop */
