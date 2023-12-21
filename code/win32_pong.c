@@ -2,6 +2,12 @@
 
 /*
 -* TODO: Cleanup Win32 locals?
+-*
+-* NOTE: This platform layer doesn't assume the game will have a flexible-free
+-* aspect ratio. The *back buffer* has a fixed 16:9 small aspect ratio
+-* resolution that can be scaled up in the *front buffer* before drawing when
+-* going fullscreen. Under the hood everything is rendered in the base
+-* resolution.
 */
 
 #define _UNICODE
@@ -242,7 +248,6 @@ INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wp
           
           /* NOTE: Toggle fullscreen - TODO: Pull out code and make a func() to start game full screen */
           if (go_fullscreen) {
-            win32_debug_print(L"Trying to go fullscreen...\n");
             ASSERT(!global_state.is_window_topmost, L"Hey, man! This can be difficult to debug, turn it off.");
             {
               DWORD window_styles;
@@ -254,9 +259,6 @@ INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wp
                 
                 monitor_info.cbSize = sizeof(monitor_info);
                 if ( (GetWindowPlacement(window, &global_state.prev_window_placement) && (GetMonitorInfoW(MonitorFromWindow(window, MONITOR_DEFAULTTOPRIMARY), &monitor_info))) ) {
-#if 0
-                  SetWindowLongW(window, GWL_STYLE,( window_styles & ~(WS_OVERLAPPEDWINDOW)));
-#endif
                   SetWindowPos(window, HWND_TOP, monitor_info.rcMonitor.left, monitor_info.rcMonitor.top, monitor_info.rcMonitor.right - monitor_info.rcMonitor.left,
                                monitor_info.rcMonitor.bottom - monitor_info.rcMonitor.top, (SWP_NOOWNERZORDER | SWP_FRAMECHANGED));
                   global_state.is_fullscreen = TRUE;
@@ -296,6 +298,7 @@ INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wp
                       ReleaseDC(window, window_dc);
                     }
                   }
+                  win32_debug_print(L"Fullscreen toggle [ON]\n");
                 } else {
                   /* TODO: Let user know it failed to go fullscreen! - Maybe a notification-area msg? */
                 }
@@ -308,6 +311,7 @@ INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wp
                 global_state.front_buffer_height = WIN32_FRONT_BUFFER_HEIGHT;
                 global_state.front_buffer_xoffset = 0;
                 global_state.front_buffer_yoffset = 0;
+                win32_debug_print(L"Fullscreen toggle [OFF]\n");
               }
             }
           }
@@ -386,7 +390,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
   
   global_state.is_cursor_visible = TRUE;
   
-  /* */
+  /* Setting up fibers */
   global_state.fiber_main = ConvertThreadToFiber(0);
   ASSERT(global_state.fiber_main != 0, L"Hey, no 'fiber_main'? No main loop.");
   global_state.fiber_message = CreateFiber(0, CAST(LPFIBER_START_ROUTINE) win32_fiber_message, 0);
@@ -569,7 +573,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
         
         /* Display the 'back_buffer' in window */
         {
-          window_dc = GetDC(window); /* NOTE: Maybe this isn't necessary at all, since I'll do the rendering myself, I don't really need to release the DC everyframe. */
+          window_dc = GetDC(window); /* NOTE: Maybe this isn't necessary at all, since I'll do the rendering myself, I don't really need to release the DC everyframe. - @IMPORTANT: Investigate. */
           /*ASSERT(window_dc != 0);*/
           /* NOTE: BitBlt is faster than SctretchDIBits, maybe, in the future, change to BitBlt and do a bitmap resize by hand for the 'front buffer'? */
           StretchDIBits(window_dc, global_state.front_buffer_xoffset, global_state.front_buffer_yoffset, global_state.front_buffer_width, global_state.front_buffer_height, 0, 0, game_back_buffer.width, game_back_buffer.height, game_back_buffer.memory, &global_state.back_buffer.bmp_info, DIB_RGB_COLORS, SRCCOPY);
@@ -616,21 +620,26 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
                 ASSERT(QueryPerformanceCounter(&current_perf_counter) != 0, L"Couldn't get processor \'performance counter\' - \'QueryPerformanceCounter(...)\' shouldn't return 0!");
                 elapsed_ms = ((current_perf_counter.QuadPart - last_perf_counter.QuadPart) * 1000.0f) / (F32) perf_frequency.QuadPart;
               }
+            } else {
+#if 0
+              ASSERT(elapsed_ms < desired_ms_per_frame, L"Missed frame rate!");
+#endif
             }
             cooked_elapsed_ms = ((current_perf_counter.QuadPart - last_perf_counter.QuadPart) * 1000.0f) / perf_frequency.QuadPart;
             dt = CAST(float) (current_perf_counter.QuadPart - last_perf_counter.QuadPart) / CAST(float) (perf_frequency.QuadPart); /* 'delta time' should be used when we want something to NOT BE frame rate dependent */
             last_perf_counter = current_perf_counter; /* NOTE: This should be here, right after the while loop to reach target ms per frame */
             
             /* NOTE: Debug 'time' print in the Visual Studio debugger */
+#if 1
             {
               LOCAL int last_print_ticks = 0;
               
-              if (GetTickCount() - last_print_ticks > 250) {
+              if (GetTickCount() - last_print_ticks > 500) {
                 last_print_ticks = GetTickCount();
-                //win32_debug_print(L"Window [x: %d, y: %d]\n", raw_elapsed_ms, cooked_elapsed_ms);
                 win32_debug_print(L"Raw MS: %fms\tCooked MS: %fms\n", raw_elapsed_ms, cooked_elapsed_ms);
               }
             }
+#endif
           }
         }
       }

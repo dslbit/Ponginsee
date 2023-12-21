@@ -1,3 +1,25 @@
+/*
+-* TODO:
+-*  |_-> Pause states
+-*  |_-> Levels
+-*
+-*  |_-> Simple linear blend of colors
+-*  |_-> Simple particle system
+-*  |_-> Simple start menu (Play, Quit) and pause menu (Return, Quit), no text
+-*  for now, just a visual representation
+-*
+-*  |_-> Menu screen (Play, Scoreboard (stores personal records), Settings
+-*  (Resolution, Audio, Controls), Quit)
+-*  |_-> Pause menu (Main menu, Quit Game)
+-*  |_-> Save progress? - IDK how crazy this will get, so do it only if it's
+-*  needed
+-*
+-*  |_-> Figure out text rendering
+-*   |_-> Show debug info in-game
+-*  |_-> Figure out the sound engine
+-*  |_-> Platform-independent: game memory, sound output, file I/O
+*/
+
 #include "pong_base.h"
 #include "pong_math.h"
 #include "pong_color.h"
@@ -6,18 +28,19 @@
 
 EXTERN_OPEN /* extern "C" { */
 
-/* TODO: Platform-independent: game memory, sound output, file I/O */
 GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
   if (!state->initialized) {
     state->initialized = TRUE;
     
     state->is_level_running = FALSE;
+    state->max_player_score = 3;
     
     state->player = entity_create(ENTITY_TYPE_PLAYER);
     state->player.pos.x = 15; /* player_xoffset */
     state->player.pos.y = (CAST(F32) back_buffer->height) / 2.0f;
     state->player.width = 12;
     state->player.height = 70;
+    state->player.color = color_create_from_hex(0x4656a5ff);
     state->player.player_data.score = 0;
     
     state->opponent = entity_create(ENTITY_TYPE_PLAYER);
@@ -25,10 +48,12 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
     state->opponent.pos.y = back_buffer->height / 2.0f;
     state->opponent.width = 12;
     state->opponent.height = 70;
+    state->opponent.color = color_create_from_hex(0xf5464cff);
     state->opponent.player_data.score = 0;
     
     state->ball = entity_create(ENTITY_TYPE_BLANK);
     state->ball.width = state->ball.height = 9;
+    state->ball.color = color_create_from_hex(0x3ec54bff);
     state->ball.pos.x = back_buffer->width / 2.0f;
     state->ball.pos.y = back_buffer->height / 2.0f;
     state->ball.vel = v2_create(-250.0f, -110.0f);
@@ -82,7 +107,6 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
       v2_zero(&opponent->acc);
       
 #if 0
-      /* NOTE: For now, opponent movement code makes the opponent almost invincible */
       if ( (state->ball.vel.y < 0) && (state->ball.pos.y < (opponent->pos.y - opponent->height/4.0f)) ) {
         opponent->acc.y = -1.0f;
       } else if ( (state->ball.vel.y > 0) && (state->ball.pos.y > (opponent->pos.y + opponent->height/4.0f)) ) {
@@ -103,18 +127,17 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
       opponent->width = 12 - ABS(opponent->vel.y * 0.00159f);
       opponent->height = 70 + ABS(opponent->vel.y * 0.05f);
 #else
+      /* NOTE: This opponent "movement code" makes the opponent invincible */
       opponent->pos.y = state->ball.pos.y;
 #endif
     }
     
-    /* NOTE: Ball movement code - TODO: Remember to clamp ball velocity < 'player_width' */
+    /* NOTE: Ball movement code - @IMPORTANT: Remember to clamp ball velocity < 'player_width' */
     {
       Entity *ball;
       
       ball = &state->ball;
       v2_zero(&ball->acc);
-      
-      /* TODO: Calc ball acceleration, maybe use an 'applied_forces' vector ; maybe after player hit? */
       
       /* checks if ball velocity mag squared is greater than player width squared - clamp ball velocity, prevent tunneling */
       {
@@ -123,7 +146,7 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
         ball_mag_squared = v2_mag_squared( v2_mul(ball->vel, input->dt) );
         player_width_squared = SQUARE(state->player.width);
         if (ball_mag_squared > player_width_squared) {
-          ball->vel = v2_add(ball->vel, v2_mul(ball->vel, -0.05f));
+          ball->vel = v2_add(ball->vel, v2_mul(ball->vel, -0.005f));
           /* TODO: Set ball mag */
 #if 0
           ASSERT(0, "Ball is too fast!!!");
@@ -132,12 +155,12 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
       }
       
       ball->pos = v2_add(ball->pos, v2_mul(ball->vel, input->dt));
-      /* TODO: Ball trail effect? */
+      /* @IDEIA: Ball trail effect? */
     }
     
     /* NOTE: Axis-aligned Collision - @IMPORTANT: make sure it's above the 'clear_background' */
     {
-      /* TODO: hit particles effects? */
+      /* @IDEIA: hit particles effects? */
       
       /* Player VS Arena collision */
       {
@@ -255,7 +278,8 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
           }
           
           ball->vel.y = ball_y_direction * ABS(ball->vel.y);
-          ball->vel = v2_mul(ball->vel, CLAMP(player->vel.y * 0.75f, 1.5f, 2.0f));
+          //ball->vel = v2_mul(ball->vel, CLAMP(player->vel.y * 0.75f, 1.5f, 2.0f));
+          ball->vel = v2_add(ball->vel, v2_mul(ball->vel, ABS(player->vel.y) * 0.0009f));
           ball->pos.x = (player->pos.x + player->width/2.0f) + (ball->width/2.0f) + 1;
           ball->vel.x *= -1;
         }
@@ -291,7 +315,6 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
         is_colliding = TRUE;
       }
       
-      /* TODO: Move ball up/down based on opponent velocity and hit point */
       if (is_colliding) {
         
 #if 0
@@ -309,12 +332,11 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
     
     /* NOTE: Checking for winner */
     {
-      /* TODO: Just copy collor from winner, no need to hard-code this - also no need to hard-code 'player_max_score' */
-      if (state->player.player_data.score == 30) {
-        state->color_winner = color_create_from_hex(0x4656a5ff);
+      if (state->player.player_data.score == state->max_player_score) {
+        state->color_winner = state->player.color;
         state->is_winner_time = TRUE;
-      } else if (state->opponent.player_data.score == 30) {
-        state->color_winner = color_create_from_hex(0xf5464cff);
+      } else if (state->opponent.player_data.score == state->max_player_score) {
+        state->color_winner = state->opponent.color;
         state->is_winner_time = TRUE;
       }
     }
@@ -322,14 +344,11 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
   
   /* NOTE: Rendering */
   {
-    GameColor color_background, color_middle_line_red, color_middle_line_white, color_player, color_opponent, color_ball;
+    GameColor color_background, color_middle_line_red, color_middle_line_white;
     
     color_background = color_create_from_hex(0x1f1723ff);
     color_middle_line_red = color_create_from_hex(0xb22741ff);
     color_middle_line_white = color_create_from_hex(0xbcb0b3ff);
-    color_player = color_create_from_hex(0x4656a5ff);
-    color_opponent = color_create_from_hex(0xf5464cff);
-    color_ball = color_create_from_hex(0x3ec54bff);
     
     if (state->is_winner_time) {
       F32 winner_rect_x, winner_rect_y, winner_rect_width, winner_rect_height;
@@ -377,7 +396,7 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
             yoffset += score_rect_height + ypadding;
             xoffset = (back_buffer->width / 2.0f) - ARENA_MIDDLE_LINE_WIDTH - score_rect_width/2.0f - xpadding;
           }
-          draw_filled_rect(back_buffer, score_rect_x, score_rect_y, score_rect_width, score_rect_height, color_player);
+          draw_filled_rect(back_buffer, score_rect_x, score_rect_y, score_rect_width, score_rect_height, state->player.color);
         }
         
         /* Opponent' score */
@@ -392,18 +411,18 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
             yoffset += score_rect_height + ypadding;
             xoffset = (back_buffer->width / 2.0f) + ARENA_MIDDLE_LINE_WIDTH + score_rect_width/2.0f + xpadding;
           }
-          draw_filled_rect(back_buffer, score_rect_x, score_rect_y, score_rect_width, score_rect_height, color_opponent);
+          draw_filled_rect(back_buffer, score_rect_x, score_rect_y, score_rect_width, score_rect_height, state->opponent.color);
         }
       }
       
-      /* Player (rect) representation - TODO: change color when moving */
-      draw_filled_rect(back_buffer, state->player.pos.x, state->player.pos.y, state->player.width, state->player.height, color_player);
+      /* Player (rect) representation - @IDEIA: change color when moving */
+      draw_filled_rect(back_buffer, state->player.pos.x, state->player.pos.y, state->player.width, state->player.height, state->player.color);
       
-      /* Opponent (rect) representation - TODO: change color when moving */
-      draw_filled_rect(back_buffer, state->opponent.pos.x, state->opponent.pos.y, state->opponent.width, state->opponent.height, color_opponent);
+      /* Opponent (rect) representation - @IDEIA: change color when moving */
+      draw_filled_rect(back_buffer, state->opponent.pos.x, state->opponent.pos.y, state->opponent.width, state->opponent.height, state->opponent.color);
       
-      /* Ball (rect) representation - TODO: change color if it's FAST */
-      draw_filled_rect(back_buffer, state->ball.pos.x, state->ball.pos.y, state->ball.width, state->ball.height, color_ball);
+      /* Ball (rect) representation - @IDEIA: change color if it's FAST */
+      draw_filled_rect(back_buffer, state->ball.pos.x, state->ball.pos.y, state->ball.width, state->ball.height, state->ball.color);
     }
   }
 }

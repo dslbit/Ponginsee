@@ -45,7 +45,7 @@ enum EntityType {
   ENTITY_TYPE_BLANK,
   ENTITY_TYPE_PLAYER,
   
-  ENTITY_COUNT
+  ENTITY_TYPE_COUNT
 };
 
 typedef struct EntityPlayer EntityPlayer;
@@ -62,6 +62,7 @@ struct Entity {
   /* NOTE: For now everything will be recty - This is used for collision and rendering */
   F32 width;
   F32 height;
+  GameColor color; /* NOTE: For now I don't have bitmaps for entities, so a color makes sense */
   
   EntityType entity_type;
   union {
