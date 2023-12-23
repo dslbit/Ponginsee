@@ -24,17 +24,27 @@
 #include "pong_base.h"
 #include "pong_math.h"
 #include "pong_color.h"
+#include "pong_entity.h"
+#include "pong_level.h"
 #include "pong_platform.h"
 #include "pong_renderer.h"
 
 EXTERN_OPEN /* extern "C" { */
 
+INTERNAL void level_update_null(GameState *state, GameInput *input);
+INTERNAL void level_update_classic(GameState *state, GameInput *input);
+
 GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
   if (!state->initialized) {
     state->initialized = TRUE;
     
-    state->is_level_running = FALSE;
-    state->level_time_elapsed = 0.0f;
+    state->game_level.id = LEVEL_ID_NULL;
+    state->game_level.is_running = FALSE;
+    state->game_level.time_elapsed = 0.0f;
+    state->game_level.min_bounding_rect_x = 0;
+    state->game_level.max_bounding_rect_x = back_buffer->width;
+    state->game_level.min_bounding_rect_y = 0;
+    state->game_level.max_bounding_rect_y = back_buffer->height;
     
     state->player = entity_create(ENTITY_TYPE_PLAYER);
     state->player.pos.x = 15; /* player_xoffset */
@@ -60,29 +70,165 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
     state->ball.vel = v2_create(-250.0f, -110.0f);
   }
   
-  if (!state->is_level_running && input->player1.start.released) {
-    state->is_level_running = TRUE;
-    state->level_time_elapsed = 0.0f;
-    /*state->is_winner_time = FALSE;*/
+  /* TODO: Select a level to start playing - maybe do something basic with the start key to cycle through the levels? */
+  {
+    if ( (input->player1.start.released) && (state->game_level.id == LEVEL_ID_NULL) ) {
+      state->game_level.id = LEVEL_ID_CLASSIC;
+    }
+  }
+  
+  /* NOTE: Level update */
+  switch (state->game_level.id) {
+    case LEVEL_ID_NULL: {
+      level_update_null(state, input);
+    } break;
     
-    /* NOTE: Reset some variables to start the new round */
-    state->player.pos.y = (CAST(F32) back_buffer->height) / 2.0f;
+    case LEVEL_ID_CLASSIC: {
+      level_update_classic(state, input);
+    } break;
+    
+    default: {
+      ASSERT(0, L"Invalid game level ID.");
+    }
+  }
+  
+  /* NOTE: Rendering */
+  {
+    GameColor color_background;
+    
+    color_background = color_create_from_hex(0x1f1723ff);
+    /* Dirty clear background before drawing, TODO: a proper 'draw_background' */
+    draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, color_background);
+    
+    
+    switch (state->game_level.id) {
+      case LEVEL_ID_CLASSIC: {
+        GameColor color_middle_line_red, color_middle_line_white, color_score;
+        
+        color_middle_line_red = color_create_from_hex(0xb22741ff);
+        color_middle_line_white = color_create_from_hex(0x8c7f90ff);
+        color_score = color_create_from_hex(0xefd081ff);
+        
+        /* Classic level arena middle line - Red: simulation not running, White: running */
+        if (!state->game_level.is_running) {
+          draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, LEVEL_CLASSIC_MIDDLE_LINE_WIDTH, CAST(F32) back_buffer->height, color_middle_line_red);
+        } else { /* game level is running */
+          draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, LEVEL_CLASSIC_MIDDLE_LINE_WIDTH, CAST(F32) back_buffer->height, color_middle_line_white);
+        }
+        
+        /* New score representation */
+        draw_filled_rect(back_buffer, state->score_rect_x, state->score_rect_y, state->score_rect_width, state->score_rect_height, color_score);
+        
+        /* Player (rect) representation - @IDEIA: change color when moving */
+        draw_filled_rect(back_buffer, state->player.pos.x, state->player.pos.y, state->player.width, state->player.height, state->player.color);
+        
+        /* Opponent (rect) representation - @IDEIA: change color when moving */
+        draw_filled_rect(back_buffer, state->opponent.pos.x, state->opponent.pos.y, state->opponent.width, state->opponent.height, state->opponent.color);
+        
+        /* Ball (rect) representation - @IDEIA: change color if it's FAST */
+        draw_filled_rect(back_buffer, state->ball.pos.x, state->ball.pos.y, state->ball.width, state->ball.height, state->ball.color);
+      } break;
+    }
+    
+    
+#if 0
+    if (state->is_winner_time) {
+      F32 winner_rect_x, winner_rect_y, winner_rect_width, winner_rect_height;
+      
+      state->player.player_data.score = 0;
+      state->opponent.player_data.score = 0;
+      state->is_level_running = FALSE;
+      draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, color_background);
+      winner_rect_width = back_buffer->width/3.0f;
+      winner_rect_height = back_buffer->width/3.0f;
+      winner_rect_x = back_buffer->width / 2.0f;
+      winner_rect_y = back_buffer->height / 2.0f;
+      draw_filled_rect(back_buffer, winner_rect_x, winner_rect_y, winner_rect_width, winner_rect_height, state->color_winner);
+    }
+#endif
+    
+    {
+      
+      
+#if 0
+      /* NOTE: Drawing players' score - represented as rects, top-centered to the player side */
+      {
+        S32 score_count, player_score, opponent_score;
+        F32 yoffset, xoffset, xpadding, ypadding;
+        F32 score_rect_x, score_rect_y, score_rect_width, score_rect_height;
+        
+        /* Player' score */
+        score_rect_width = 9;
+        score_rect_height = 9;
+        xpadding = 5;
+        ypadding = 3;
+        xoffset = (back_buffer->width / 2.0f) - ARENA_MIDDLE_LINE_WIDTH - score_rect_width/2.0f - xpadding;
+        yoffset = score_rect_height;
+        player_score = state->player.player_data.score;
+        for (score_count = 1; score_count <= player_score; ++score_count) {
+          score_rect_x = xoffset;
+          score_rect_y = yoffset;
+          xoffset -= score_rect_width + xpadding;
+          if ( (score_count != 0) && (score_count % 10 == 0) ) {
+            yoffset += score_rect_height + ypadding;
+            xoffset = (back_buffer->width / 2.0f) - ARENA_MIDDLE_LINE_WIDTH - score_rect_width/2.0f - xpadding;
+          }
+          draw_filled_rect(back_buffer, score_rect_x, score_rect_y, score_rect_width, score_rect_height, state->player.color);
+        }
+        
+        /* Opponent' score */
+        xoffset = (back_buffer->width / 2.0f) + ARENA_MIDDLE_LINE_WIDTH + score_rect_width/2.0f + xpadding;
+        yoffset = score_rect_height;
+        opponent_score = state->opponent.player_data.score;
+        for (score_count = 1; score_count <= opponent_score; ++score_count) {
+          score_rect_x = xoffset;
+          score_rect_y = yoffset;
+          xoffset += score_rect_width + xpadding;
+          if ( (score_count != 0) && (score_count % 10 == 0) ) {
+            yoffset += score_rect_height + ypadding;
+            xoffset = (back_buffer->width / 2.0f) + ARENA_MIDDLE_LINE_WIDTH + score_rect_width/2.0f + xpadding;
+          }
+          draw_filled_rect(back_buffer, score_rect_x, score_rect_y, score_rect_width, score_rect_height, state->opponent.color);
+        }
+      }
+#endif
+    }
+  }
+}
+
+INTERNAL void level_update_null(GameState *state, GameInput *input) {
+  /* TODO: Maybe do something to identify a null level? */
+}
+
+INTERNAL void level_update_classic(GameState *state, GameInput *input) {
+  F32 level_bounding_rect_width, level_bounding_rect_height;
+  
+  level_bounding_rect_width = CAST(F32) (state->game_level.max_bounding_rect_x - state->game_level.min_bounding_rect_x);
+  level_bounding_rect_height = CAST(F32) (state->game_level.max_bounding_rect_y - state->game_level.min_bounding_rect_y);
+  
+  /* Level setup */
+  if (!state->game_level.is_running && input->player1.start.released) {
+    state->game_level.is_running = TRUE;
+    state->game_level.time_elapsed = 0.0f;
+    
+    state->player.pos.y = level_bounding_rect_height / 2.0f;
     state->player.width = 12;
     state->player.height = 70;
     
-    state->opponent.pos.y = back_buffer->height / 2.0f;
+    state->opponent.pos.y = level_bounding_rect_height / 2.0f;
     state->opponent.width = 12;
     state->opponent.height = 70;
     
-    state->ball.pos.x = back_buffer->width / 2.0f;
-    state->ball.pos.y = back_buffer->height / 2.0f;
+    state->ball.pos.x = level_bounding_rect_width / 2.0f;
+    state->ball.pos.y = level_bounding_rect_height / 2.0f;
     state->ball.vel = v2_create(-250.0f, -110.0f);
     
     /* TODO: Render arena state again? */
   }
   
-  if (state->is_level_running) {
-    /* NOTE: Player movement code */
+  /* Level update */
+  if (state->game_level.is_running) { /* level is running */
+    /* Player movement code */
     {
       Entity *player;
       
@@ -101,7 +247,7 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
       player->height = 70 + ABS(player->vel.y * 0.05f);
     }
     
-    /* NOTE: Opponent movement code */
+    /* Opponent movement code */
     {
       Entity *opponent;
       
@@ -129,12 +275,12 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
       opponent->width = 12 - ABS(opponent->vel.y * 0.00159f);
       opponent->height = 70 + ABS(opponent->vel.y * 0.05f);
 #else
-      /* NOTE: This opponent "movement code" makes the opponent invincible */
+      /* This opponent "movement code" makes the opponent invincible */
       opponent->pos.y = state->ball.pos.y;
 #endif
     }
     
-    /* NOTE: Ball movement code - @IMPORTANT: Remember to clamp ball velocity < 'player_width' */
+    /* Ball movement code - @IMPORTANT: Remember to clamp ball velocity < 'player_width' */
     {
       Entity *ball;
       
@@ -160,7 +306,7 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
       /* @IDEIA: Ball trail effect? */
     }
     
-    /* NOTE: Axis-aligned Collision - @IMPORTANT: make sure it's above the 'clear_background' */
+    /* Axis-aligned Collision - @IMPORTANT: make sure it's above the 'clear_background' */
     {
       /* @IDEIA: hit particles effects? */
       
@@ -178,8 +324,8 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
 #endif
         
         player_bottom = CAST(S32) (state->player.pos.y + (state->player.height / 2.0f));
-        if (player_bottom > back_buffer->height) {
-          state->player.pos.y = (CAST(F32) back_buffer->height) - state->player.height / 2.0f;
+        if (player_bottom > level_bounding_rect_height) {
+          state->player.pos.y = level_bounding_rect_height - state->player.height/2.0f;
           state->player.vel = v2_add(state->player.vel, v2_mul(state->player.vel, -2.5f));
         }
 #if 0
@@ -198,8 +344,8 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
         }
         
         opponent_hit_point_bottom = CAST(S32) (state->opponent.pos.y + (state->opponent.height / 2.0f));
-        if (opponent_hit_point_bottom > back_buffer->height) {
-          state->opponent.pos.y = (CAST(F32) back_buffer->height) - state->opponent.height / 2.0f;
+        if (opponent_hit_point_bottom > level_bounding_rect_height) {
+          state->opponent.pos.y = level_bounding_rect_height - state->opponent.height/2.0f;
           state->opponent.vel = v2_add(state->opponent.vel, v2_mul(state->opponent.vel, -0.5f));
         }
       }
@@ -217,26 +363,26 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
         }
         
         ball_hit_point_bottom = CAST(S32) (ball->pos.y + ball->height/2.0f);
-        if (ball_hit_point_bottom  > back_buffer->height) {
-          ball->pos.y = CAST(F32) (back_buffer->height - ball->height/2.0f);
+        if (ball_hit_point_bottom  > level_bounding_rect_height) {
+          ball->pos.y = level_bounding_rect_height - ball->height/2.0f;
           ball->vel.y *= -1;
         }
         
         ball_hit_point_left = CAST(S32) (ball->pos.x - ball->width/2.0f);
         if (ball_hit_point_left < 0) {
-          ball->pos.x = back_buffer->width/2.0f;
-          ball->pos.y = back_buffer->height/2.0f;
+          ball->pos.x = level_bounding_rect_width/2.0f;
+          ball->pos.y = level_bounding_rect_height/2.0f;
           /*state->opponent.player_data.score++;*/
           state->opponent.player_data.score_accumulation = 0.0f;
-          state->is_level_running = FALSE;
+          state->game_level.is_running = FALSE;
         }
         
         ball_hit_point_right = CAST(S32) (ball->pos.x + ball->width/2.0f);
-        if (ball_hit_point_right > back_buffer->width) {
-          ball->pos.x = back_buffer->width/2.0f;
-          ball->pos.y = back_buffer->height/2.0f;
+        if (ball_hit_point_right > level_bounding_rect_width) {
+          ball->pos.x = level_bounding_rect_width/2.0f;
+          ball->pos.y = level_bounding_rect_height/2.0f;
           /*state->player.player_data.score++;*/
-          state->is_level_running = FALSE;
+          state->game_level.is_running = FALSE;
         }
       }
       
@@ -333,124 +479,22 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
       }
     }
     
-    /* NOTE: Checking for winner */
-#if 0
-    {
-      if (state->player.player_data.score == state->max_player_score) {
-        state->color_winner = state->player.color;
-        state->is_winner_time = TRUE;
-      } else if (state->opponent.player_data.score == state->max_player_score) {
-        state->color_winner = state->opponent.color;
-        state->is_winner_time = TRUE;
-      }
-    }
-#endif
-    
-    /* Re-imagining player score / score progress - Using the arena middle line as a load bar to next levels */
+    /* Re-imagining player score / score progress - Using the arena middle line as a 'load bar' to next levels */
     {
       F32 score_rect_base_height;
       
-#define ARENA_MIDDLE_LINE_WIDTH 3
-      state->level_time_elapsed += input->dt; /* accumulate dt - Maybe do this somewhere else */
-      score_rect_base_height = round_f32(back_buffer->height / 100.0f);
-      state->score_rect_height = CAST(F32) (round_f32_to_s32(state->level_time_elapsed) * score_rect_base_height);
-      /* TODO: Check if 'score_rect_height' is half the back buffer height, then change level */
-      state->score_rect_x = back_buffer->width/2.0f;
-      state->score_rect_y = back_buffer->height/2.0f;// 0.0f;
-      state->score_rect_width = ARENA_MIDDLE_LINE_WIDTH;
-    }
-  }
-  
-  /* NOTE: Rendering */
-  {
-    GameColor color_background, color_middle_line_red, color_middle_line_white, color_score;
-    
-    color_background = color_create_from_hex(0x1f1723ff);
-    color_middle_line_red = color_create_from_hex(0xb22741ff);
-    color_middle_line_white = color_create_from_hex(0x8c7f90ff);
-    color_score= color_create_from_hex(0xefd081ff);
-    
-#if 0
-    if (state->is_winner_time) {
-      F32 winner_rect_x, winner_rect_y, winner_rect_width, winner_rect_height;
-      
-      state->player.player_data.score = 0;
-      state->opponent.player_data.score = 0;
-      state->is_level_running = FALSE;
-      draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, color_background);
-      winner_rect_width = back_buffer->width/3.0f;
-      winner_rect_height = back_buffer->width/3.0f;
-      winner_rect_x = back_buffer->width / 2.0f;
-      winner_rect_y = back_buffer->height / 2.0f;
-      draw_filled_rect(back_buffer, winner_rect_x, winner_rect_y, winner_rect_width, winner_rect_height, state->color_winner);
-    }
-#endif
-    {
-      /* Dirty clear background before drawing, TODO: a proper 'draw_background' */
-      draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, color_background);
-      
-      /* Arena middle line - Red: simulation not running, White: running */
-      if (!state->is_level_running) {
-        draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, ARENA_MIDDLE_LINE_WIDTH, CAST(F32) back_buffer->height, color_middle_line_red);
-      } else {
-        draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, ARENA_MIDDLE_LINE_WIDTH, CAST(F32) back_buffer->height, color_middle_line_white);
+      state->game_level.time_elapsed += input->dt; /* accumulate dt - Maybe do this somewhere else */
+      score_rect_base_height = round_f32(level_bounding_rect_height / 10.0f);
+      state->score_rect_height = CAST(F32) (round_f32_to_s32(state->game_level.time_elapsed) * score_rect_base_height);
+      if (state->score_rect_height >= level_bounding_rect_height) {
+        state->game_level.time_elapsed = 0.0f;
+        state->game_level.is_running = FALSE;
+        state->game_level.id = LEVEL_ID_NULL; /* TODO: Next level - Level transition goes here */
       }
       
-      
-#if 0
-      /* NOTE: Drawing players' score - represented as rects, top-centered to the player side */
-      {
-        S32 score_count, player_score, opponent_score;
-        F32 yoffset, xoffset, xpadding, ypadding;
-        F32 score_rect_x, score_rect_y, score_rect_width, score_rect_height;
-        
-        /* Player' score */
-        score_rect_width = 9;
-        score_rect_height = 9;
-        xpadding = 5;
-        ypadding = 3;
-        xoffset = (back_buffer->width / 2.0f) - ARENA_MIDDLE_LINE_WIDTH - score_rect_width/2.0f - xpadding;
-        yoffset = score_rect_height;
-        player_score = state->player.player_data.score;
-        for (score_count = 1; score_count <= player_score; ++score_count) {
-          score_rect_x = xoffset;
-          score_rect_y = yoffset;
-          xoffset -= score_rect_width + xpadding;
-          if ( (score_count != 0) && (score_count % 10 == 0) ) {
-            yoffset += score_rect_height + ypadding;
-            xoffset = (back_buffer->width / 2.0f) - ARENA_MIDDLE_LINE_WIDTH - score_rect_width/2.0f - xpadding;
-          }
-          draw_filled_rect(back_buffer, score_rect_x, score_rect_y, score_rect_width, score_rect_height, state->player.color);
-        }
-        
-        /* Opponent' score */
-        xoffset = (back_buffer->width / 2.0f) + ARENA_MIDDLE_LINE_WIDTH + score_rect_width/2.0f + xpadding;
-        yoffset = score_rect_height;
-        opponent_score = state->opponent.player_data.score;
-        for (score_count = 1; score_count <= opponent_score; ++score_count) {
-          score_rect_x = xoffset;
-          score_rect_y = yoffset;
-          xoffset += score_rect_width + xpadding;
-          if ( (score_count != 0) && (score_count % 10 == 0) ) {
-            yoffset += score_rect_height + ypadding;
-            xoffset = (back_buffer->width / 2.0f) + ARENA_MIDDLE_LINE_WIDTH + score_rect_width/2.0f + xpadding;
-          }
-          draw_filled_rect(back_buffer, score_rect_x, score_rect_y, score_rect_width, score_rect_height, state->opponent.color);
-        }
-      }
-#endif
-      
-      /* New score representation */
-      draw_filled_rect(back_buffer, state->score_rect_x, state->score_rect_y, state->score_rect_width, state->score_rect_height, color_score);
-      
-      /* Player (rect) representation - @IDEIA: change color when moving */
-      draw_filled_rect(back_buffer, state->player.pos.x, state->player.pos.y, state->player.width, state->player.height, state->player.color);
-      
-      /* Opponent (rect) representation - @IDEIA: change color when moving */
-      draw_filled_rect(back_buffer, state->opponent.pos.x, state->opponent.pos.y, state->opponent.width, state->opponent.height, state->opponent.color);
-      
-      /* Ball (rect) representation - @IDEIA: change color if it's FAST */
-      draw_filled_rect(back_buffer, state->ball.pos.x, state->ball.pos.y, state->ball.width, state->ball.height, state->ball.color);
+      state->score_rect_x = level_bounding_rect_width/2.0f;
+      state->score_rect_y = level_bounding_rect_height/2.0f;
+      state->score_rect_width = LEVEL_CLASSIC_MIDDLE_LINE_WIDTH;
     }
   }
 }

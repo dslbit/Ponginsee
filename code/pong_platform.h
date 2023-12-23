@@ -40,42 +40,11 @@ struct GameInput {
   GameControllerInput player1;
 };
 
-typedef enum EntityType EntityType;
-enum EntityType {
-  ENTITY_TYPE_BLANK,
-  ENTITY_TYPE_PLAYER,
-  
-  ENTITY_TYPE_COUNT
-};
-
-typedef struct EntityPlayer EntityPlayer;
-struct EntityPlayer {
-  F32 score_accumulation;
-};
-
-typedef struct Entity Entity;
-struct Entity {
-  V2 pos;
-  V2 vel;
-  V2 acc;
-  
-  /* NOTE: For now everything will be recty - This is used for collision and rendering */
-  F32 width;
-  F32 height;
-  GameColor color; /* NOTE: For now I don't have bitmaps for entities, so a color makes sense */
-  
-  EntityType entity_type;
-  union {
-    EntityPlayer player_data;
-  };
-};
-
 typedef struct GameState GameState;
 struct GameState {
   B32 initialized;
   
-  B32 is_level_running;
-  F32 level_time_elapsed;
+  GameLevel game_level;
   F32 score_rect_x;
   F32 score_rect_y;
   F32 score_rect_width;
@@ -86,13 +55,6 @@ struct GameState {
   Entity opponent;
   Entity ball;
 };
-
-INTERNAL INLINE Entity entity_create(EntityType type) {
-  Entity result = {0};
-  
-  result.entity_type = type;
-  return result;
-}
 
 #define GAME_UPDATE_AND_RENDER_PROTOTYPE(_name) void _name(GameBackBuffer *back_buffer, GameInput *input, GameState *state)
 typedef GAME_UPDATE_AND_RENDER_PROTOTYPE(GameUpdateAndRenderFuncType);
