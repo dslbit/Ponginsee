@@ -2,6 +2,7 @@
 -* TODO:
 -*  |_-> Pause states
 -*  |_-> Levels
+-*   |_-> Horizontal pong
 -*
 -*  |_-> Simple linear blend of colors
 -*  |_-> Simple particle system
@@ -33,7 +34,7 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
     state->initialized = TRUE;
     
     state->is_level_running = FALSE;
-    state->max_player_score = 3;
+    state->level_time_elapsed = 0.0f;
     
     state->player = entity_create(ENTITY_TYPE_PLAYER);
     state->player.pos.x = 15; /* player_xoffset */
@@ -41,7 +42,7 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
     state->player.width = 12;
     state->player.height = 70;
     state->player.color = color_create_from_hex(0x4656a5ff);
-    state->player.player_data.score = 0;
+    state->player.player_data.score_accumulation = 0.0f;
     
     state->opponent = entity_create(ENTITY_TYPE_PLAYER);
     state->opponent.pos.x = CAST(F32) (back_buffer->width - 15);
@@ -49,7 +50,7 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
     state->opponent.width = 12;
     state->opponent.height = 70;
     state->opponent.color = color_create_from_hex(0xf5464cff);
-    state->opponent.player_data.score = 0;
+    state->opponent.player_data.score_accumulation = 0.0f;
     
     state->ball = entity_create(ENTITY_TYPE_BLANK);
     state->ball.width = state->ball.height = 9;
@@ -61,7 +62,8 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
   
   if (!state->is_level_running && input->player1.start.released) {
     state->is_level_running = TRUE;
-    state->is_winner_time = FALSE;
+    state->level_time_elapsed = 0.0f;
+    /*state->is_winner_time = FALSE;*/
     
     /* NOTE: Reset some variables to start the new round */
     state->player.pos.y = (CAST(F32) back_buffer->height) / 2.0f;
@@ -224,7 +226,8 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
         if (ball_hit_point_left < 0) {
           ball->pos.x = back_buffer->width/2.0f;
           ball->pos.y = back_buffer->height/2.0f;
-          state->opponent.player_data.score++;
+          /*state->opponent.player_data.score++;*/
+          state->opponent.player_data.score_accumulation = 0.0f;
           state->is_level_running = FALSE;
         }
         
@@ -232,7 +235,7 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
         if (ball_hit_point_right > back_buffer->width) {
           ball->pos.x = back_buffer->width/2.0f;
           ball->pos.y = back_buffer->height/2.0f;
-          state->player.player_data.score++;
+          /*state->player.player_data.score++;*/
           state->is_level_running = FALSE;
         }
       }
@@ -278,7 +281,7 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
           }
           
           ball->vel.y = ball_y_direction * ABS(ball->vel.y);
-          //ball->vel = v2_mul(ball->vel, CLAMP(player->vel.y * 0.75f, 1.5f, 2.0f));
+          /*ball->vel = v2_mul(ball->vel, CLAMP(player->vel.y * 0.75f, 1.5f, 2.0f));*/
           ball->vel = v2_add(ball->vel, v2_mul(ball->vel, ABS(player->vel.y) * 0.0009f));
           ball->pos.x = (player->pos.x + player->width/2.0f) + (ball->width/2.0f) + 1;
           ball->vel.x *= -1;
@@ -331,6 +334,7 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
     }
     
     /* NOTE: Checking for winner */
+#if 0
     {
       if (state->player.player_data.score == state->max_player_score) {
         state->color_winner = state->player.color;
@@ -340,16 +344,33 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
         state->is_winner_time = TRUE;
       }
     }
+#endif
+    
+    /* Re-imagining player score / score progress - Using the arena middle line as a load bar to next levels */
+    {
+      F32 score_rect_base_height;
+      
+#define ARENA_MIDDLE_LINE_WIDTH 3
+      state->level_time_elapsed += input->dt; /* accumulate dt - Maybe do this somewhere else */
+      score_rect_base_height = round_f32(back_buffer->height / 100.0f);
+      state->score_rect_height = CAST(F32) (round_f32_to_s32(state->level_time_elapsed) * score_rect_base_height);
+      /* TODO: Check if 'score_rect_height' is half the back buffer height, then change level */
+      state->score_rect_x = back_buffer->width/2.0f;
+      state->score_rect_y = back_buffer->height/2.0f;// 0.0f;
+      state->score_rect_width = ARENA_MIDDLE_LINE_WIDTH;
+    }
   }
   
   /* NOTE: Rendering */
   {
-    GameColor color_background, color_middle_line_red, color_middle_line_white;
+    GameColor color_background, color_middle_line_red, color_middle_line_white, color_score;
     
     color_background = color_create_from_hex(0x1f1723ff);
     color_middle_line_red = color_create_from_hex(0xb22741ff);
-    color_middle_line_white = color_create_from_hex(0xbcb0b3ff);
+    color_middle_line_white = color_create_from_hex(0x8c7f90ff);
+    color_score= color_create_from_hex(0xefd081ff);
     
+#if 0
     if (state->is_winner_time) {
       F32 winner_rect_x, winner_rect_y, winner_rect_width, winner_rect_height;
       
@@ -362,18 +383,21 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
       winner_rect_x = back_buffer->width / 2.0f;
       winner_rect_y = back_buffer->height / 2.0f;
       draw_filled_rect(back_buffer, winner_rect_x, winner_rect_y, winner_rect_width, winner_rect_height, state->color_winner);
-    } else {
+    }
+#endif
+    {
       /* Dirty clear background before drawing, TODO: a proper 'draw_background' */
       draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, color_background);
       
       /* Arena middle line - Red: simulation not running, White: running */
-#define ARENA_MIDDLE_LINE_WIDTH 3
       if (!state->is_level_running) {
         draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, ARENA_MIDDLE_LINE_WIDTH, CAST(F32) back_buffer->height, color_middle_line_red);
       } else {
         draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, ARENA_MIDDLE_LINE_WIDTH, CAST(F32) back_buffer->height, color_middle_line_white);
       }
       
+      
+#if 0
       /* NOTE: Drawing players' score - represented as rects, top-centered to the player side */
       {
         S32 score_count, player_score, opponent_score;
@@ -414,6 +438,10 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
           draw_filled_rect(back_buffer, score_rect_x, score_rect_y, score_rect_width, score_rect_height, state->opponent.color);
         }
       }
+#endif
+      
+      /* New score representation */
+      draw_filled_rect(back_buffer, state->score_rect_x, state->score_rect_y, state->score_rect_width, state->score_rect_height, color_score);
       
       /* Player (rect) representation - @IDEIA: change color when moving */
       draw_filled_rect(back_buffer, state->player.pos.x, state->player.pos.y, state->player.width, state->player.height, state->player.color);

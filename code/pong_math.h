@@ -6,6 +6,14 @@
 EXTERN_OPEN /* extern "C" { */
 
 /* NOTE: Round towards zero - Not good for negative values */
+INTERNAL INLINE F32 round_f32(F32 value) {
+  F32 result;
+  
+  result = CAST(F32) (CAST(S32) (value + 0.5f));
+  return result;
+}
+
+/* NOTE: Round towards zero - Not good for negative values */
 INTERNAL INLINE S32 round_f32_to_s32(F32 value) {
   S32 result;
   

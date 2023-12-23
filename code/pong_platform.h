@@ -36,7 +36,7 @@ struct GameControllerInput {
 
 typedef struct GameInput GameInput;
 struct GameInput {
-  float dt;
+  float dt; /* last frame seconds elapsed */
   GameControllerInput player1;
 };
 
@@ -50,7 +50,7 @@ enum EntityType {
 
 typedef struct EntityPlayer EntityPlayer;
 struct EntityPlayer {
-  U32 score;
+  F32 score_accumulation;
 };
 
 typedef struct Entity Entity;
@@ -75,8 +75,12 @@ struct GameState {
   B32 initialized;
   
   B32 is_level_running;
-  B32 is_winner_time;
-  U32 max_player_score;
+  F32 level_time_elapsed;
+  F32 score_rect_x;
+  F32 score_rect_y;
+  F32 score_rect_width;
+  F32 score_rect_height;
+  
   GameColor color_winner;
   Entity player;
   Entity opponent;
