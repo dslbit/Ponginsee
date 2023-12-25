@@ -318,7 +318,8 @@ INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wp
         } break;
         
         case VK_ESCAPE: {
-          
+          game_input->player1.back.pressed = pressed;
+          game_input->player1.back.released = released;
         } break;
         
         case VK_UP:
