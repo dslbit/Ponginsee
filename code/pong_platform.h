@@ -29,6 +29,17 @@ struct GameControllerInput {
       GameButtonState down;
       GameButtonState left;
       GameButtonState right;
+      
+      GameButtonState aux0;
+      GameButtonState aux1;
+      GameButtonState aux2;
+      GameButtonState aux3;
+      GameButtonState aux4;
+      GameButtonState aux5;
+      GameButtonState aux6;
+      GameButtonState aux7;
+      GameButtonState aux8;
+      GameButtonState aux9;
     };
   };
   
@@ -37,6 +48,7 @@ struct GameControllerInput {
 typedef struct GameInput GameInput;
 struct GameInput {
   float dt; /* last frame seconds elapsed */
+  V2 mouse_pos;
   GameControllerInput player1;
 };
 
@@ -50,7 +62,13 @@ struct GameState {
   F32 score_rect_width;
   F32 score_rect_height;
   
-  GameColor color_winner;
+  /* NOTE: TEMPORARY - Test level data */
+  Entity box;
+  Entity rect;
+  
+  GameColor background_color;
+  /* @IMPORTANT: In a more generalized view, 'game_level' should store the
+entities - Right? */
   Entity player;
   Entity opponent;
   Entity ball;

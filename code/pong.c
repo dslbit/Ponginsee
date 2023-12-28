@@ -25,6 +25,7 @@
 #include "pong_math.h"
 #include "pong_color.h"
 #include "pong_entity.h"
+#include "pong_collision.h"
 #include "pong_level.h"
 #include "pong_platform.h"
 #include "pong_renderer.h"
@@ -32,6 +33,7 @@
 EXTERN_OPEN /* extern "C" { */
 
 INTERNAL void level_update_null(GameState *state, GameInput *input);
+INTERNAL void level_test(GameBackBuffer *back_buffer, GameInput *input, GameState *state);
 INTERNAL void level_update_classic(GameState *state, GameInput *input);
 INTERNAL void level_update_horizontal_classic(GameState *state, GameInput *input);
 
@@ -39,9 +41,12 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
   if (!state->initialized) {
     state->initialized = TRUE;
     
+    
+    state->background_color = color_create_from_hex(0x1f1723ff);
     /* NOTE: Maybe this should be moved to the level update function
-initialization place */
+        initialization place */
     state->game_level.id = LEVEL_ID_NULL;
+    state->game_level.is_initialized = FALSE;
     state->game_level.is_running = FALSE;
     state->game_level.time_elapsed = 0.0f;
     state->game_level.min_bounding_rect_x = 0;
@@ -60,33 +65,53 @@ initialization place */
     state->ball = entity_create(ENTITY_TYPE_BLANK);
     state->ball.color = color_create_from_hex(0x3ec54bff);
     state->ball.vel = v2_create(-250.0f, -110.0f);
+    state->ball.width = 7;
+    state->ball.height = 7;
   }
   
-  /* TODO: Select a level to start playing - maybe do something basic with the start key to cycle through the levels? */
+  /* NOTE: Primitve level selection */
   {
-    if (input->player1.start.released && (state->game_level.id == LEVEL_ID_NULL) ) {
-      state->game_level.id = LEVEL_ID_CLASSIC;
-    }
-    
     if (input->player1.back.released && (state->game_level.id != LEVEL_ID_NULL)) {
       state->game_level.is_initialized = FALSE;
       state->game_level.is_running = FALSE;
       state->game_level.id = LEVEL_ID_NULL;
     }
+    
+    if (input->player1.start.released && (state->game_level.id == LEVEL_ID_NULL) ) {
+#if 0
+      state->game_level.id = LEVEL_ID_HORIZONTAL_CLASSIC; /* TODO: Progression, next level when current level is finished */
+#endif
+    }
+    
+    if (input->player1.aux0.released) {
+      state->game_level.is_initialized = FALSE;
+      state->game_level.is_running = FALSE;
+      state->game_level.id = LEVEL_ID_TEST;
+    }
+    
+    
   }
   
-  /* NOTE: Level update */
+  /* NOTE: Level update and render */
   switch (state->game_level.id) {
     case LEVEL_ID_NULL: {
-      level_update_null(state, input);
+      level_update_null(state, input); /* TODO: Update to the 'test level' structure */
+    } break;
+    
+    case LEVEL_ID_TEST: {
+      level_test(back_buffer, input, state);
     } break;
     
     case LEVEL_ID_CLASSIC: {
-      level_update_classic(state, input);
+#if 0
+      level_update_classic(state, input); /* TODO: Update to the 'test level' structure */
+#endif
     } break;
     
     case LEVEL_ID_HORIZONTAL_CLASSIC: {
-      level_update_horizontal_classic(state, input);
+#if 0
+      level_update_horizontal_classic(state, input); /* TODO: Update to the 'test level' structure */
+#endif
     } break;
     
     default: {
@@ -94,6 +119,7 @@ initialization place */
     }
   }
   
+#if 0
   /* NOTE: Rendering */
   {
     GameColor color_background;
@@ -101,7 +127,6 @@ initialization place */
     color_background = color_create_from_hex(0x1f1723ff);
     /* Dirty clear background before drawing, TODO: a proper 'draw_background' */
     draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, color_background);
-    
     
     switch (state->game_level.id) {
       case LEVEL_ID_CLASSIC: {
@@ -158,9 +183,13 @@ initialization place */
         draw_filled_rect(back_buffer, state->ball.pos.x, state->ball.pos.y, state->ball.width, state->ball.height, state->ball.color);
       } break;
     }
+    
+    draw_filled_rect(back_buffer, input->mouse_pos.x, input->mouse_pos.y, 150, 90, color_create_from_hex(0x4995f3ff));
   }
+#endif
 }
 
+/* TODO: Update to the 'test level' structure */
 INTERNAL void level_update_null(GameState *state, GameInput *input) {
   /* TODO: Maybe do something to identify a null level? */
   state->game_level.is_running = TRUE;
@@ -176,6 +205,62 @@ INTERNAL void level_update_null(GameState *state, GameInput *input) {
   v2_zero(&state->ball.vel);
 }
 
+INTERNAL void level_test(GameBackBuffer *back_buffer, GameInput *input, GameState *state) {
+  
+  /* Test level: setup */
+  if (!state->game_level.is_initialized) {
+    state->game_level.is_initialized = TRUE;
+    state->game_level.is_running = TRUE;
+    state->game_level.time_elapsed = 0.0f;
+    
+    state->rect.pos.x = input->mouse_pos.x;
+    state->rect.pos.y = input->mouse_pos.y;
+    state->rect.width = 300;
+    state->rect.height = 21;
+    state->rect.color = color_create_from_hex(0x4995f3ff);
+    
+    state->box.pos.x = (state->game_level.min_bounding_rect_x + state->game_level.max_bounding_rect_x) / 2.0f;
+    state->box.pos.y = (state->game_level.min_bounding_rect_y + state->game_level.max_bounding_rect_y) / 2.0f;
+    state->box.width = 120;
+    state->box.height = 120;
+    state->box.color = color_create_from_hex(0xf79c88ff);
+  }
+  
+  /* Test level: update */
+  {
+    state->rect.pos.x = input->mouse_pos.x;
+    state->rect.pos.y = input->mouse_pos.y;
+    
+    /* AABB vs AABB - box vs rect */
+    {
+      B32 is_colliding;
+      
+      is_colliding = collision_aabb_vs_aabb(state->rect.pos, state->rect.width, state->rect.height, state->box.pos, state->box.width, state->box.height);
+      
+      if (is_colliding) {
+        state->rect.color = color_create_from_hex(0x72deebff);
+      } else {
+        state->rect.color = color_create_from_hex(0x4995f3ff);
+      }
+    }
+    
+  }
+  
+  /* Test level: render */
+  {
+    /* TODO: Better background clear */
+    draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, state->background_color);
+    
+    /* Box in the middle of the screen - TODO: Render debug entity function - draw
+based on entity type with game resources or base color e.g. renderer_debug_entity(back_buffer, entity) */
+    draw_filled_rect(back_buffer, state->box.pos.x, state->box.pos.y, state->box.width, state->box.height, state->box.color);
+    
+    /* Rect at mouse position */
+    draw_filled_rect(back_buffer, state->rect.pos.x, state->rect.pos.y, state->rect.width, state->rect.height, state->rect.color);
+  }
+}
+
+/* TODO: Update to the 'test level' structure */
 INTERNAL void level_update_classic(GameState *state, GameInput *input) {
   F32 level_bounding_rect_width, level_bounding_rect_height;
   
@@ -381,7 +466,7 @@ INTERNAL void level_update_classic(GameState *state, GameInput *input) {
         ball_hit_point_left = CAST(S32) (ball->pos.x - ball->width/2.0f);
         ball_hit_point_right = CAST(S32) (ball->pos.x + ball->width/2.0f);
         
-        /* AABB vs AABB - Ball vs Player */
+        /* AABB vs AABB - Ball vs Player - TODO: Fix, this is not AABB vs AABB */
         if ( (ball_hit_point_left >= player_hit_point_left) && (ball_hit_point_left <= player_hit_point_right) && (ball_hit_point_top >= player_hit_point_top) && (ball_hit_point_bottom <= player_hit_point_bottom) ) {
           is_colliding = TRUE;
         } else if ( (ball_hit_point_right >= player_hit_point_left) && (ball_hit_point_right <= player_hit_point_right) && (ball_hit_point_top >= player_hit_point_top) && (ball_hit_point_bottom <= player_hit_point_bottom) ) {
@@ -431,7 +516,7 @@ INTERNAL void level_update_classic(GameState *state, GameInput *input) {
       ball_hit_point_left = CAST(S32) (ball->pos.x - ball->width/2.0f);
       ball_hit_point_right = CAST(S32) (ball->pos.x + ball->width/2.0f);
       
-      /* AABB vs AABB - Ball vs Opponent */
+      /* AABB vs AABB - Ball vs Opponent - TODO: Fix, this is not AABB vs AABB */
       if ( (ball_hit_point_left >= opponent_hit_point_left) && (ball_hit_point_left <= opponent_hit_point_right) && (ball_hit_point_top >= opponent_hit_point_top) && (ball_hit_point_bottom <= opponent_hit_point_bottom) ) {
         is_colliding = TRUE;
       } else if ( (ball_hit_point_right >= opponent_hit_point_left) && (ball_hit_point_right <= opponent_hit_point_right) && (ball_hit_point_top >= opponent_hit_point_top) && (ball_hit_point_bottom <= opponent_hit_point_bottom) ) {
@@ -474,6 +559,7 @@ INTERNAL void level_update_classic(GameState *state, GameInput *input) {
   }
 }
 
+/* TODO: Update to the 'test level' structure */
 INTERNAL void level_update_horizontal_classic(GameState *state, GameInput *input) {
   F32 level_bounding_rect_width, level_bounding_rect_height;
   
@@ -684,7 +770,7 @@ it's a copy-pasta of the classic level */
         ball_hit_point_left = CAST(S32) (ball->pos.x - ball->width/2.0f);
         ball_hit_point_right = CAST(S32) (ball->pos.x + ball->width/2.0f);
         
-        /* AABB vs AABB - Ball vs Player - TODO: Test, it seems wrong! */
+        /* AABB vs AABB - Ball vs Player - - TODO: Fix, this is not AABB vs AABB */
         if ( (ball_hit_point_left >= player_hit_point_left) && (ball_hit_point_left <= player_hit_point_right) && (ball_hit_point_top >= player_hit_point_top) && (ball_hit_point_bottom <= player_hit_point_bottom) ) {
           is_colliding = TRUE;
         } else if ( (ball_hit_point_right >= player_hit_point_left) && (ball_hit_point_right <= player_hit_point_right) && (ball_hit_point_top >= player_hit_point_top) && (ball_hit_point_bottom <= player_hit_point_bottom) ) {
@@ -733,7 +819,7 @@ it's a copy-pasta of the classic level */
         ball_hit_point_left = CAST(S32) (ball->pos.x - ball->width/2.0f);
         ball_hit_point_right = CAST(S32) (ball->pos.x + ball->width/2.0f);
         
-        /* AABB vs AABB - Ball vs Opponent - TODO: Test, it seems wrong */
+        /* AABB vs AABB - Ball vs Opponent - - TODO: Fix, this is not AABB vs AABB */
         if ( (ball_hit_point_left >= opponent_hit_point_left) && (ball_hit_point_left <= opponent_hit_point_right) && (ball_hit_point_top >= opponent_hit_point_top) && (ball_hit_point_bottom <= opponent_hit_point_bottom) ) {
           is_colliding = TRUE;
         } else if ( (ball_hit_point_right >= opponent_hit_point_left) && (ball_hit_point_right <= opponent_hit_point_right) && (ball_hit_point_top >= opponent_hit_point_top) && (ball_hit_point_bottom <= opponent_hit_point_bottom) ) {

@@ -44,6 +44,7 @@ __debugbreak();\
 #include <windows.h>
 #include <strsafe.h>
 #include <wchar.h>
+#include <windowsx.h>
 
 typedef struct Win32BackBuffer Win32BackBuffer;
 struct Win32BackBuffer {
@@ -140,6 +141,12 @@ INTERNAL void win32_unload_game_code(Win32GameCode *game_code) {
   game_code->update_and_render = 0;
 }
 
+INTERNAL void win32_change_key_state(GameButtonState *button, B32 pressed, B32 released) {
+  ASSERT(button != 0, L"'win32_key_event_helper' failed! Null 'button'!");
+  button->pressed = pressed;
+  button->released = released;
+}
+
 INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wparam, LPARAM lparam) {
   LRESULT result;
   GameInput *game_input;
@@ -211,12 +218,17 @@ INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wp
       global_state.front_buffer_yoffset = 0;
     } break;
     
+    case WM_MOUSEMOVE: {
+      game_input->mouse_pos.x = CAST(F32) GET_X_LPARAM(lparam);
+      game_input->mouse_pos.y = CAST(F32) GET_Y_LPARAM(lparam);
+    } break;
+    
     case WM_KEYDOWN:
     case WM_KEYUP:
     case WM_SYSKEYDOWN:
     case WM_SYSKEYUP: {
       DWORD key;
-      S32 is_down, was_down, pressed, released;
+      B32 is_down, was_down, pressed, released;
       
       if (game_input == 0) {
         break;
@@ -238,8 +250,7 @@ INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wp
           is_alt_pressed = (lparam & (1 << 29)) != 0;
           go_fullscreen = FALSE;
           if (key == VK_RETURN && is_alt_pressed == FALSE) {
-            game_input->player1.start.pressed = pressed;
-            game_input->player1.start.released = released;
+            win32_change_key_state(&game_input->player1.start, pressed, released);
           } else if (key == VK_F11 && released) {
             go_fullscreen = TRUE;
           } else if (key == VK_RETURN && released && is_alt_pressed) {
@@ -318,32 +329,27 @@ INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wp
         } break;
         
         case VK_ESCAPE: {
-          game_input->player1.back.pressed = pressed;
-          game_input->player1.back.released = released;
+          win32_change_key_state(&game_input->player1.back, pressed, released);
         } break;
         
         case VK_UP:
         case 'W': {
-          game_input->player1.up.pressed = pressed;
-          game_input->player1.up.released = released;
+          win32_change_key_state(&game_input->player1.up, pressed, released);
         } break;
         
         case VK_DOWN:
         case 'S': {
-          game_input->player1.down.pressed = pressed;
-          game_input->player1.down.released = released;
+          win32_change_key_state(&game_input->player1.down, pressed, released);
         } break;
         
         case VK_LEFT:
         case 'A': {
-          game_input->player1.left.pressed = pressed;
-          game_input->player1.left.released = released;
+          win32_change_key_state(&game_input->player1.left, pressed, released);
         } break;
         
         case VK_RIGHT:
         case 'D': {
-          game_input->player1.right.pressed = pressed;
-          game_input->player1.right.released = released;
+          win32_change_key_state(&game_input->player1.right, pressed, released);
         } break;
         
         case VK_F4: {
@@ -354,6 +360,17 @@ INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wp
             global_state.is_running = FALSE;
           };
         } break;
+        
+        case '0': { win32_change_key_state(&game_input->player1.aux0, pressed, released); } break;
+        case '1': { win32_change_key_state(&game_input->player1.aux1, pressed, released); } break;
+        case '2': { win32_change_key_state(&game_input->player1.aux2, pressed, released); } break;
+        case '3': { win32_change_key_state(&game_input->player1.aux3, pressed, released); } break;
+        case '4': { win32_change_key_state(&game_input->player1.aux4, pressed, released); } break;
+        case '5': { win32_change_key_state(&game_input->player1.aux5, pressed, released); } break;
+        case '6': { win32_change_key_state(&game_input->player1.aux6, pressed, released); } break;
+        case '7': { win32_change_key_state(&game_input->player1.aux7, pressed, released); } break;
+        case '8': { win32_change_key_state(&game_input->player1.aux8, pressed, released); } break;
+        case '9': { win32_change_key_state(&game_input->player1.aux9, pressed, released); } break;
       }
       
     } break;
