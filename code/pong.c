@@ -32,9 +32,9 @@
 
 EXTERN_OPEN /* extern "C" { */
 
-INTERNAL void level_update_null(GameState *state, GameInput *input);
+INTERNAL void level_null(GameBackBuffer *back_buffer, GameInput *input, GameState *state);
 INTERNAL void level_test(GameBackBuffer *back_buffer, GameInput *input, GameState *state);
-INTERNAL void level_update_classic(GameState *state, GameInput *input);
+INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameState *state);
 INTERNAL void level_update_horizontal_classic(GameState *state, GameInput *input);
 
 GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
@@ -78,11 +78,12 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
     }
     
     if (input->player1.start.released && (state->game_level.id == LEVEL_ID_NULL) ) {
-#if 0
-      state->game_level.id = LEVEL_ID_HORIZONTAL_CLASSIC; /* TODO: Progression, next level when current level is finished */
-#endif
+      state->game_level.is_initialized = FALSE;
+      state->game_level.is_running = FALSE;
+      state->game_level.id = LEVEL_ID_CLASSIC; /* TODO: Progression, next level when current level is finished */
     }
     
+    /* Test level selection */
     if (input->player1.aux0.released) {
       state->game_level.is_initialized = FALSE;
       state->game_level.is_running = FALSE;
@@ -95,7 +96,7 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
   /* NOTE: Level update and render */
   switch (state->game_level.id) {
     case LEVEL_ID_NULL: {
-      level_update_null(state, input); /* TODO: Update to the 'test level' structure */
+      level_null(back_buffer, input, state); /* TODO: Update to the 'test level' structure */
     } break;
     
     case LEVEL_ID_TEST: {
@@ -103,9 +104,7 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
     } break;
     
     case LEVEL_ID_CLASSIC: {
-#if 0
-      level_update_classic(state, input); /* TODO: Update to the 'test level' structure */
-#endif
+      level_classic(back_buffer, input, state);
     } break;
     
     case LEVEL_ID_HORIZONTAL_CLASSIC: {
@@ -189,20 +188,23 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
 #endif
 }
 
-/* TODO: Update to the 'test level' structure */
-INTERNAL void level_update_null(GameState *state, GameInput *input) {
-  /* TODO: Maybe do something to identify a null level? */
-  state->game_level.is_running = TRUE;
-  state->game_level.time_elapsed = 0.0f;
+INTERNAL void level_null(GameBackBuffer *back_buffer, GameInput *input, GameState *state) {
+  /* Null level: setup */
+  if (!state->game_level.is_initialized) {
+    state->game_level.is_initialized = TRUE;
+    state->game_level.is_running = TRUE;
+    state->game_level.time_elapsed = 0.0f;
+    
+    v2_zero(&state->opponent.vel);
+    v2_zero(&state->player.vel);
+    v2_zero(&state->ball.vel);
+  }
   
-#if 0
-  v2_zero(&state->player.pos);
-  v2_zero(&state->opponent.pos);
-  v2_zero(&state->ball.pos);
-#endif
-  v2_zero(&state->opponent.vel);
-  v2_zero(&state->player.vel);
-  v2_zero(&state->ball.vel);
+  /* Null level: rendering */
+  {
+    /* TODO: Better background clear */
+    draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, state->background_color);
+  }
 }
 
 INTERNAL void level_test(GameBackBuffer *back_buffer, GameInput *input, GameState *state) {
@@ -260,14 +262,13 @@ based on entity type with game resources or base color e.g. renderer_debug_entit
   }
 }
 
-/* TODO: Update to the 'test level' structure */
-INTERNAL void level_update_classic(GameState *state, GameInput *input) {
+INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameState *state) {
   F32 level_bounding_rect_width, level_bounding_rect_height;
   
   level_bounding_rect_width = CAST(F32) (state->game_level.max_bounding_rect_x - state->game_level.min_bounding_rect_x);
   level_bounding_rect_height = CAST(F32) (state->game_level.max_bounding_rect_y - state->game_level.min_bounding_rect_y);
   
-  /* Classic - Level setup */
+  /* Classic level: setup */
   if (!state->game_level.is_initialized) {
     state->game_level.is_initialized = TRUE;
     state->game_level.is_running = TRUE;
@@ -290,7 +291,7 @@ INTERNAL void level_update_classic(GameState *state, GameInput *input) {
     /* TODO: Render arena state again? */
   }
   
-  /* Classic - Level update */
+  /* Classic level: update and render */
   if (state->game_level.is_running) { /* level is running */
     /* Player movement code */
     {
@@ -370,7 +371,8 @@ INTERNAL void level_update_classic(GameState *state, GameInput *input) {
       /* @IDEIA: Ball trail effect? */
     }
     
-    /* Axis-aligned Collision - @IMPORTANT: make sure it's above the 'clear_background' */
+    /* Axis-aligned Collision - @IMPORTANT: make sure it's above the 'clear_background'
+- TODO: Pull out the 'entity vs arena' code? */
     {
       /* @IDEIA: hit particles effects? */
       
@@ -433,6 +435,7 @@ INTERNAL void level_update_classic(GameState *state, GameInput *input) {
           /*state->opponent.player_data.score++;*/
           state->opponent.player_data.score_accumulation = 0.0f;
           state->game_level.is_running = FALSE;
+          state->game_level.is_initialized = FALSE;
         }
         
         ball_hit_point_right = CAST(S32) (ball->pos.x + ball->width/2.0f);
@@ -441,101 +444,60 @@ INTERNAL void level_update_classic(GameState *state, GameInput *input) {
           ball->pos.y = level_bounding_rect_height/2.0f;
           /*state->player.player_data.score++;*/
           state->game_level.is_running = FALSE;
+          state->game_level.is_initialized = FALSE;
         }
       }
       
-      /* Ball VS Player collision */
+      /* Ball VS Player collision & resolution - Player is to the left side of
+the arena */
       {
-        Entity *player;
-        Entity *ball;
-        S32 player_hit_point_top, player_hit_point_bottom, player_hit_point_left, player_hit_point_right;
-        S32 ball_hit_point_top, ball_hit_point_bottom, ball_hit_point_left, ball_hit_point_right;
         B32 is_colliding;
-        
-        is_colliding = FALSE;
+        Entity *player, *ball;
         
         player = &state->player;
-        player_hit_point_top = CAST(S32) (player->pos.y - player->height/2.0f);
-        player_hit_point_bottom = CAST(S32) (player->pos.y + player->height/2.0f);
-        player_hit_point_left = CAST(S32) (player->pos.x - player->width/2.0f);
-        player_hit_point_right = CAST(S32) (player->pos.x + player->width/2.0f);
-        
         ball = &state->ball;
-        ball_hit_point_top = CAST(S32) (ball->pos.y - ball->height/2.0f);
-        ball_hit_point_bottom = CAST(S32) (ball->pos.y + ball->height/2.0f);
-        ball_hit_point_left = CAST(S32) (ball->pos.x - ball->width/2.0f);
-        ball_hit_point_right = CAST(S32) (ball->pos.x + ball->width/2.0f);
-        
-        /* AABB vs AABB - Ball vs Player - TODO: Fix, this is not AABB vs AABB */
-        if ( (ball_hit_point_left >= player_hit_point_left) && (ball_hit_point_left <= player_hit_point_right) && (ball_hit_point_top >= player_hit_point_top) && (ball_hit_point_bottom <= player_hit_point_bottom) ) {
-          is_colliding = TRUE;
-        } else if ( (ball_hit_point_right >= player_hit_point_left) && (ball_hit_point_right <= player_hit_point_right) && (ball_hit_point_top >= player_hit_point_top) && (ball_hit_point_bottom <= player_hit_point_bottom) ) {
-          is_colliding = TRUE;
-        }
-        
+        is_colliding = collision_aabb_vs_aabb(ball->pos, ball->width, ball->height, player->pos, player->width, player->height);
         if (is_colliding) {
           F32 ball_y_direction;
           
-          /* TODO: 0 = problem, idk what to do here for the ball movement */
+          ball->pos.x = (player->pos.x + player->width/2.0f) + ball->width/2.0f + 1;
+          
           if (player->vel.y < 0) {
             ball_y_direction = -1;
-          } else if (player->vel.y > 0) {
-            ball_y_direction = 1;
           } else {
-            ball_y_direction = 0;
+            ball_y_direction = 1;
           }
-          
           ball->vel.y = ball_y_direction * ABS(ball->vel.y);
-          /*ball->vel = v2_mul(ball->vel, CLAMP(player->vel.y * 0.75f, 1.5f, 2.0f));*/
           ball->vel = v2_add(ball->vel, v2_mul(ball->vel, ABS(player->vel.y) * 0.0009f));
-          ball->pos.x = (player->pos.x + player->width/2.0f) + (ball->width/2.0f) + 1;
           ball->vel.x *= -1;
         }
       }
-    }
-    
-    /* Ball VS Opponent collision */
-    {
-      Entity *opponent;
-      Entity *ball;
-      S32 opponent_hit_point_top, opponent_hit_point_bottom, opponent_hit_point_left, opponent_hit_point_right;
-      S32 ball_hit_point_top, ball_hit_point_bottom, ball_hit_point_left, ball_hit_point_right;
-      B32 is_colliding;
       
-      is_colliding = FALSE;
-      
-      opponent = &state->opponent;
-      opponent_hit_point_top = CAST(S32) (opponent->pos.y - opponent->height/2.0f);
-      opponent_hit_point_bottom = CAST(S32) (opponent->pos.y + opponent->height/2.0f);
-      opponent_hit_point_left = CAST(S32) (opponent->pos.x - opponent->width/2.0f);
-      opponent_hit_point_right = CAST(S32) (opponent->pos.x + opponent->width/2.0f);
-      
-      ball = &state->ball;
-      ball_hit_point_top = CAST(S32) (ball->pos.y - ball->height/2.0f);
-      ball_hit_point_bottom = CAST(S32) (ball->pos.y + ball->height/2.0f);
-      ball_hit_point_left = CAST(S32) (ball->pos.x - ball->width/2.0f);
-      ball_hit_point_right = CAST(S32) (ball->pos.x + ball->width/2.0f);
-      
-      /* AABB vs AABB - Ball vs Opponent - TODO: Fix, this is not AABB vs AABB */
-      if ( (ball_hit_point_left >= opponent_hit_point_left) && (ball_hit_point_left <= opponent_hit_point_right) && (ball_hit_point_top >= opponent_hit_point_top) && (ball_hit_point_bottom <= opponent_hit_point_bottom) ) {
-        is_colliding = TRUE;
-      } else if ( (ball_hit_point_right >= opponent_hit_point_left) && (ball_hit_point_right <= opponent_hit_point_right) && (ball_hit_point_top >= opponent_hit_point_top) && (ball_hit_point_bottom <= opponent_hit_point_bottom) ) {
-        is_colliding = TRUE;
-      }
-      
-      if (is_colliding) {
+      /* Ball VS Opponent collision - The opponent is to the right side of
+the arena */
+      {
+        B32 is_colliding;
+        Entity *opponent, *ball;
         
-#if 0
-        if (ball->pos.y > opponent->pos.y) {
-          ball->vel.y = (ball->vel.y > 0) ? -ball->pos.y : ball->pos.y;
-        } else {
-          ball->vel.y = (ball->vel.y < 0) ? ABS(ball->pos.y) : ball->pos.y;
+        opponent = &state->opponent;
+        ball = &state->ball;
+        is_colliding = collision_aabb_vs_aabb(ball->pos, ball->width, ball->height, opponent->pos, opponent->width, opponent->height);
+        if (is_colliding) {
+          F32 ball_y_direction;
+          
+          ball->pos.x = (opponent->pos.x - opponent->width/2.0f) - ball->width/2.0f - 1;
+          
+          if (opponent->vel.y < 0) {
+            ball_y_direction = -1;
+          } else {
+            ball_y_direction = 1;
+          }
+          ball->vel.y = ball_y_direction * ABS(ball->vel.y);
+          ball->vel = v2_add(ball->vel, v2_mul(ball->vel, ABS(opponent->vel.y) * 0.0009f));
+          ball->vel.x *= -1;
         }
-#endif
-        
-        ball->pos.x = (opponent->pos.x - opponent->width/2.0f) - (ball->width/2.0f) + 1;
-        ball->vel.x *= -1;
       }
+      
     }
     
     /* Re-imagining player score / score progress - Using the arena middle line as a 'load bar' to next levels */
@@ -555,6 +517,37 @@ INTERNAL void level_update_classic(GameState *state, GameInput *input) {
       state->score_rect_x = level_bounding_rect_width/2.0f;
       state->score_rect_y = level_bounding_rect_height/2.0f;
       state->score_rect_width = LEVEL_CLASSIC_MIDDLE_LINE_WIDTH;
+    }
+    
+    /* Classic level: rendering */
+    {
+      GameColor color_middle_line_red, color_middle_line_white, color_score;
+      
+      color_middle_line_red = color_create_from_hex(0xb22741ff);
+      color_middle_line_white = color_create_from_hex(0x8c7f90ff);
+      color_score = color_create_from_hex(0xefd081ff);
+      
+      /* TODO: Better background clear */
+      draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, state->background_color);
+      
+      /* Classic level arena middle line - Red: simulation not running, White: running */
+      if (!state->game_level.is_running) {
+        draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, LEVEL_CLASSIC_MIDDLE_LINE_WIDTH, CAST(F32) back_buffer->height, color_middle_line_red);
+      } else { /* game level is running */
+        draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, LEVEL_CLASSIC_MIDDLE_LINE_WIDTH, CAST(F32) back_buffer->height, color_middle_line_white);
+      }
+      
+      /* New score representation */
+      draw_filled_rect(back_buffer, state->score_rect_x, state->score_rect_y, state->score_rect_width, state->score_rect_height, color_score);
+      
+      /* Ball (rect) representation - @IDEIA: change color if it's FAST */
+      draw_filled_rect(back_buffer, state->ball.pos.x, state->ball.pos.y, state->ball.width, state->ball.height, state->ball.color);
+      
+      /* Player (rect) representation - @IDEIA: change color when moving */
+      draw_filled_rect(back_buffer, state->player.pos.x, state->player.pos.y, state->player.width, state->player.height, state->player.color);
+      
+      /* Opponent (rect) representation - @IDEIA: change color when moving */
+      draw_filled_rect(back_buffer, state->opponent.pos.x, state->opponent.pos.y, state->opponent.width, state->opponent.height, state->opponent.color);
     }
   }
 }

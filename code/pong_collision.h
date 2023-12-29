@@ -8,6 +8,7 @@ INTERNAL INLINE B32 collision_aabb_vs_aabb(V2 a_origin, F32 a_width, F32 a_heigh
   F32 a_min_x, a_min_y, a_max_x, a_max_y;
   F32 b_min_x, b_min_y, b_max_x, b_max_y;
   
+  is_colliding = FALSE;
   a_min_x = a_origin.x - a_width/2.0f;
   a_max_x = a_origin.x + a_width/2.0f;
   a_min_y = a_origin.y - a_height/2.0f;
