@@ -3,6 +3,9 @@
 -*  |_-> Render debug entity function - draw based on entity type with game
 -*  resources or base color e.g. renderer_debug_entity(back_buffer, entity)
 -*
+-*  |_-> Simplify the score calculation - I don't want to change the logic
+-*  of every level when changing something basic in the 'game_level' struct
+-*
 -*  |_-> Pull out the entity vs arena code? Maybe return a v2 -1 to 1 range to
 -*  identify where entity was before going out of bounds
 -*
@@ -39,6 +42,7 @@ INTERNAL void level_null(GameBackBuffer *back_buffer, GameInput *input, GameStat
 INTERNAL void level_test(GameBackBuffer *back_buffer, GameInput *input, GameState *state);
 INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameState *state);
 INTERNAL void level_horizontal_classic(GameBackBuffer *back_buffer, GameInput *input, GameState *state);
+INTERNAL void level_end(GameBackBuffer *back_buffer, GameInput *input, GameState *state);
 
 GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
   if (!state->is_initialized) {
@@ -52,6 +56,7 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
     state->game_level.is_initialized = FALSE;
     state->game_level.is_running = FALSE;
     state->game_level.time_elapsed = 0.0f;
+    state->game_level.time_max = 60.0f;
     state->game_level.min_bounding_rect_x = 0;
     state->game_level.max_bounding_rect_x = back_buffer->width;
     state->game_level.min_bounding_rect_y = 0;
@@ -74,6 +79,7 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
   
   /* NOTE: Primitve level selection & pause action */
   {
+    /* pause state */
     if(input->player1.start.released && (state->game_level.id != LEVEL_ID_NULL)) {
       if (state->is_paused) {
         state->is_showing_paused_screen = FALSE;
@@ -81,6 +87,7 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
       state->is_paused = !state->is_paused;
     }
     
+    /* return to menu state */
     if (input->player1.back.released && (state->game_level.id != LEVEL_ID_NULL)) {
       if (state->is_paused) {
         state->is_showing_paused_screen = FALSE;
@@ -91,13 +98,14 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
       state->game_level.id = LEVEL_ID_NULL;
     }
     
+    /* press start to play state */
     if (input->player1.start.released && (state->game_level.id == LEVEL_ID_NULL)) {
       state->game_level.is_initialized = FALSE;
       state->game_level.is_running = FALSE;
-      state->game_level.id = LEVEL_ID_HORIZONTAL_CLASSIC;
+      state->game_level.id = LEVEL_ID_END;
     }
     
-    /* Test level selection */
+    /* Test level - Collision test */
     if (input->player1.aux0.released) {
       state->game_level.is_initialized = FALSE;
       state->game_level.is_running = FALSE;
@@ -133,6 +141,10 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
       level_horizontal_classic(back_buffer, input, state);
     } break;
     
+    case LEVEL_ID_END: {
+      level_end(back_buffer, input, state);
+    } break;
+    
     default: {
       ASSERT(0, L"Invalid game level ID.");
     }
@@ -150,6 +162,9 @@ INTERNAL void level_null(GameBackBuffer *back_buffer, GameInput *input, GameStat
     v2_zero(&state->player.vel);
     v2_zero(&state->ball.vel);
   }
+  
+  /* Null level: update */
+  {}
   
   /* Null level: rendering */
   {
@@ -455,9 +470,9 @@ the arena */
       F32 score_rect_base_height;
       
       state->game_level.time_elapsed += input->dt; /* accumulate dt - Maybe do this somewhere else */
-      score_rect_base_height = round_f32(level_bounding_rect_height / 10.0f);
+      score_rect_base_height = round_f32(level_bounding_rect_height / state->game_level.time_max);
       state->score_rect_height = CAST(F32) (round_f32_to_s32(state->game_level.time_elapsed) * score_rect_base_height);
-      if (state->score_rect_height >= level_bounding_rect_height) {
+      if (state->score_rect_height >= level_bounding_rect_height && (state->game_level.time_elapsed >= state->game_level.time_max)) {
         state->game_level.time_elapsed = 0.0f;
         state->game_level.is_running = FALSE;
         state->game_level.is_initialized = FALSE;
@@ -751,13 +766,13 @@ it's a copy-pasta of the classic level */
       F32 score_rect_base_width;
       
       state->game_level.time_elapsed += input->dt; /* accumulate dt - Maybe do this somewhere else */
-      score_rect_base_width = round_f32(level_bounding_rect_width / 10.0f);
+      score_rect_base_width = round_f32(level_bounding_rect_width / state->game_level.time_max);
       state->score_rect_width = CAST(F32) (round_f32_to_s32(state->game_level.time_elapsed) * score_rect_base_width);
-      if (state->score_rect_width >= level_bounding_rect_width) {
+      if (state->score_rect_width >= level_bounding_rect_width && (state->game_level.time_elapsed >= state->game_level.time_max)) {
         state->game_level.time_elapsed = 0.0f;
         state->game_level.is_running = FALSE;
         state->game_level.is_initialized = FALSE;
-        state->game_level.id = LEVEL_ID_NULL; /* TODO: Next level - Level transition goes here */
+        state->game_level.id = LEVEL_ID_END; /* TODO: Next level - Level transition goes here */
       }
       
       state->score_rect_x = level_bounding_rect_width/2.0f;
@@ -795,6 +810,41 @@ it's a copy-pasta of the classic level */
       /* Ball (rect) representation - @IDEIA: change color if it's FAST */
       draw_filled_rect(back_buffer, state->ball.pos.x, state->ball.pos.y, state->ball.width, state->ball.height, state->ball.color);
     }
+  }
+}
+
+/* NOTE: Credits? IDK */
+INTERNAL void level_end(GameBackBuffer *back_buffer, GameInput *input, GameState *state) {
+  /* End level: setup */
+  if (!state->game_level.is_initialized) {
+    state->game_level.is_initialized = TRUE;
+    state->game_level.is_running = TRUE;
+    state->game_level.time_elapsed = 0.0f;
+    state->game_level.time_max = 5.0f;
+    
+    v2_zero(&state->opponent.vel);
+    v2_zero(&state->player.vel);
+    v2_zero(&state->ball.vel);
+  }
+  
+  /* End level: update */
+  {
+    state->game_level.time_elapsed += input->dt;
+    if (state->game_level.time_elapsed >= state->game_level.time_max) {
+      state->game_level.is_initialized = FALSE;
+      state->game_level.is_running = FALSE;
+      state->game_level.id = LEVEL_ID_NULL;
+    }
+  }
+  
+  /* End level: rendering */
+  {
+    GameColor end_background_color;
+    
+    end_background_color = color_create_from_hex(0xf09548ff);
+    
+    /* TODO: Better background clear */
+    draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, end_background_color);
   }
 }
 

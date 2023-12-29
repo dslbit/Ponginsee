@@ -12,6 +12,7 @@ enum LevelID {
   LEVEL_ID_TEST,
   LEVEL_ID_CLASSIC,
   LEVEL_ID_HORIZONTAL_CLASSIC,
+  LEVEL_ID_END,
   
   LEVEL_ID_COUNT
 };
@@ -25,7 +26,8 @@ struct GameLevel {
   S32 max_bounding_rect_y;
   B32 is_initialized;
   B32 is_running;
-  F32 time_elapsed;
+  F32 time_elapsed; /* in seconds */
+  F32 time_max; /* in seconds */
 };
 
 EXTERN_CLOSE /* } */
