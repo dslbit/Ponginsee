@@ -21,7 +21,7 @@ struct GameButtonState {
 typedef struct GameControllerInput GameControllerInput;
 struct GameControllerInput {
   union {
-    GameButtonState buttons[6];
+    GameButtonState buttons[16];
     struct {
       GameButtonState start;
       GameButtonState back; /* also used for menu (escape key / select on controller) */
@@ -54,7 +54,9 @@ struct GameInput {
 
 typedef struct GameState GameState;
 struct GameState {
-  B32 initialized;
+  B32 is_initialized;
+  B32 is_paused;
+  B32 is_showing_paused_screen;
   
   GameLevel game_level;
   F32 score_rect_x;
@@ -67,6 +69,7 @@ struct GameState {
   Entity rect;
   
   GameColor background_color;
+  GameColor background_color_paused;
   /* @IMPORTANT: In a more generalized view, 'game_level' should store the
 entities - Right? */
   Entity player;

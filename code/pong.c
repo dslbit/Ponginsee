@@ -1,13 +1,10 @@
 /*
 -* TODO:
--*  |_-> Pause states - is_paused, is_showing_paused_screen
--*  |_-> Levels
+-*  |_-> Render debug entity function - draw based on entity type with game
+-*  resources or base color e.g. renderer_debug_entity(back_buffer, entity)
 -*
 -*  |_-> Pull out the entity vs arena code? Maybe return a v2 -1 to 1 range to
 -*  identify where entity was before going out of bounds
--*
--*  |_-> Render debug entity function - draw based on entity type with game
--*  resources or base color e.g. renderer_debug_entity(back_buffer, entity)
 -*
 -*  |_-> Simple linear blend of colors
 -*  |_-> Simple particle system
@@ -44,11 +41,11 @@ INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameS
 INTERNAL void level_horizontal_classic(GameBackBuffer *back_buffer, GameInput *input, GameState *state);
 
 GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
-  if (!state->initialized) {
-    state->initialized = TRUE;
-    
+  if (!state->is_initialized) {
+    state->is_initialized = TRUE;
     
     state->background_color = color_create_from_hex(0x1f1723ff);
+    state->background_color_paused = color_create_from_hex(0x3c2f52ff);
     /* NOTE: Maybe this should be moved to the level update function
         initialization place */
     state->game_level.id = LEVEL_ID_NULL;
@@ -75,15 +72,26 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
     state->ball.height = 7;
   }
   
-  /* NOTE: Primitve level selection */
+  /* NOTE: Primitve level selection & pause action */
   {
+    if(input->player1.start.released && (state->game_level.id != LEVEL_ID_NULL)) {
+      if (state->is_paused) {
+        state->is_showing_paused_screen = FALSE;
+      }
+      state->is_paused = !state->is_paused;
+    }
+    
     if (input->player1.back.released && (state->game_level.id != LEVEL_ID_NULL)) {
+      if (state->is_paused) {
+        state->is_showing_paused_screen = FALSE;
+        state->is_paused = !state->is_paused;
+      }
       state->game_level.is_initialized = FALSE;
       state->game_level.is_running = FALSE;
       state->game_level.id = LEVEL_ID_NULL;
     }
     
-    if (input->player1.start.released && (state->game_level.id == LEVEL_ID_NULL) ) {
+    if (input->player1.start.released && (state->game_level.id == LEVEL_ID_NULL)) {
       state->game_level.is_initialized = FALSE;
       state->game_level.is_running = FALSE;
       state->game_level.id = LEVEL_ID_HORIZONTAL_CLASSIC;
@@ -95,8 +103,16 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
       state->game_level.is_running = FALSE;
       state->game_level.id = LEVEL_ID_TEST;
     }
-    
-    
+  }
+  
+  if (state->is_paused) {
+    if (!state->is_showing_paused_screen) {
+      state->is_showing_paused_screen = TRUE;
+      
+      /* TODO: Better background clear */
+      draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, state->background_color_paused);
+    }
+    return;
   }
   
   /* NOTE: Level update and render */
@@ -121,75 +137,6 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
       ASSERT(0, L"Invalid game level ID.");
     }
   }
-  
-#if 0
-  /* NOTE: Rendering */
-  {
-    GameColor color_background;
-    
-    color_background = color_create_from_hex(0x1f1723ff);
-    /* Dirty clear background before drawing, TODO: a proper 'draw_background' */
-    draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, color_background);
-    
-    switch (state->game_level.id) {
-      case LEVEL_ID_CLASSIC: {
-        GameColor color_middle_line_red, color_middle_line_white, color_score;
-        
-        color_middle_line_red = color_create_from_hex(0xb22741ff);
-        color_middle_line_white = color_create_from_hex(0x8c7f90ff);
-        color_score = color_create_from_hex(0xefd081ff);
-        
-        /* Classic level arena middle line - Red: simulation not running, White: running */
-        if (!state->game_level.is_running) {
-          draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, LEVEL_CLASSIC_MIDDLE_LINE_WIDTH, CAST(F32) back_buffer->height, color_middle_line_red);
-        } else { /* game level is running */
-          draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, LEVEL_CLASSIC_MIDDLE_LINE_WIDTH, CAST(F32) back_buffer->height, color_middle_line_white);
-        }
-        
-        /* New score representation */
-        draw_filled_rect(back_buffer, state->score_rect_x, state->score_rect_y, state->score_rect_width, state->score_rect_height, color_score);
-        
-        /* Player (rect) representation - @IDEIA: change color when moving */
-        draw_filled_rect(back_buffer, state->player.pos.x, state->player.pos.y, state->player.width, state->player.height, state->player.color);
-        
-        /* Opponent (rect) representation - @IDEIA: change color when moving */
-        draw_filled_rect(back_buffer, state->opponent.pos.x, state->opponent.pos.y, state->opponent.width, state->opponent.height, state->opponent.color);
-        
-        /* Ball (rect) representation - @IDEIA: change color if it's FAST */
-        draw_filled_rect(back_buffer, state->ball.pos.x, state->ball.pos.y, state->ball.width, state->ball.height, state->ball.color);
-      } break;
-      
-      case LEVEL_ID_HORIZONTAL_CLASSIC: {
-        GameColor color_middle_line_red, color_middle_line_white, color_score;
-        
-        color_middle_line_red = color_create_from_hex(0xb22741ff);
-        color_middle_line_white = color_create_from_hex(0x8c7f90ff);
-        color_score = color_create_from_hex(0xefd081ff);
-        
-        /* Classic level arena middle line - Red: simulation not running, White: running */
-        if (!state->game_level.is_running) {
-          draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, LEVEL_HORIZONTAL_CLASSIC_MIDDLE_LINE_HEIGHT, color_middle_line_red);
-        } else { /* game level is running */
-          draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, LEVEL_HORIZONTAL_CLASSIC_MIDDLE_LINE_HEIGHT, color_middle_line_white);
-        }
-        
-        /* New score representation - @IDEIA: Draw the remaining space even though is greater than bounding box? */
-        draw_filled_rect(back_buffer, state->score_rect_x, state->score_rect_y, state->score_rect_width, state->score_rect_height, color_score);
-        
-        /* Player (rect) representation - @IDEIA: change color when moving */
-        draw_filled_rect(back_buffer, state->player.pos.x, state->player.pos.y, state->player.width, state->player.height, state->player.color);
-        
-        /* Opponent (rect) representation - @IDEIA: change color when moving */
-        draw_filled_rect(back_buffer, state->opponent.pos.x, state->opponent.pos.y, state->opponent.width, state->opponent.height, state->opponent.color);
-        
-        /* Ball (rect) representation - @IDEIA: change color if it's FAST */
-        draw_filled_rect(back_buffer, state->ball.pos.x, state->ball.pos.y, state->ball.width, state->ball.height, state->ball.color);
-      } break;
-    }
-    
-    draw_filled_rect(back_buffer, input->mouse_pos.x, input->mouse_pos.y, 150, 90, color_create_from_hex(0x4995f3ff));
-  }
-#endif
 }
 
 INTERNAL void level_null(GameBackBuffer *back_buffer, GameInput *input, GameState *state) {
