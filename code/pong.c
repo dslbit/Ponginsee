@@ -1,5 +1,5 @@
 /*
--* TODO:
+-* TODO LIST:
 -*  |_-> Render debug entity function - draw based on entity type with game
 -*  resources or base color e.g. renderer_debug_entity(back_buffer, entity)
 -*
@@ -102,7 +102,7 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
     if (input->player1.start.released && (state->game_level.id == LEVEL_ID_NULL)) {
       state->game_level.is_initialized = FALSE;
       state->game_level.is_running = FALSE;
-      state->game_level.id = LEVEL_ID_END;
+      state->game_level.id = LEVEL_ID_CLASSIC;
     }
     
     /* Test level - Collision test */
@@ -111,13 +111,27 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
       state->game_level.is_running = FALSE;
       state->game_level.id = LEVEL_ID_TEST;
     }
+    
+    /* Load classic level shortcut */
+    if (input->player1.aux1.released) {
+      state->game_level.is_initialized = FALSE;
+      state->game_level.is_running = FALSE;
+      state->game_level.id = LEVEL_ID_CLASSIC;
+    }
+    
+    /* Load horizontal classic level shortcut */
+    if (input->player1.aux2.released) {
+      state->game_level.is_initialized = FALSE;
+      state->game_level.is_running = FALSE;
+      state->game_level.id = LEVEL_ID_HORIZONTAL_CLASSIC;
+    }
   }
   
   if (state->is_paused) {
     if (!state->is_showing_paused_screen) {
       state->is_showing_paused_screen = TRUE;
       
-      /* TODO: Better background clear */
+      /* TODO: Better background clear - Also add TRANSPARENCY here */
       draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, state->background_color_paused);
     }
     return;
@@ -239,11 +253,13 @@ INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameS
     state->game_level.is_running = TRUE;
     state->game_level.time_elapsed = 0.0f;
     
+    v2_zero(&state->player.vel);
     state->player.pos.x = 15;
     state->player.pos.y = level_bounding_rect_height / 2.0f;
     state->player.width = 12;
     state->player.height = 70;
     
+    v2_zero(&state->opponent.vel);
     state->opponent.pos.x = level_bounding_rect_width - 15;
     state->opponent.pos.y = level_bounding_rect_height / 2.0f;
     state->opponent.width = 12;
@@ -428,10 +444,12 @@ the arena */
           
           if (player->vel.y < 0) {
             ball_y_direction = -1;
-          } else {
+            ball->vel.y = ball_y_direction * ABS(ball->vel.y);
+          } else if (player->vel.y > 0.001) {
             ball_y_direction = 1;
+            ball->vel.y = ball_y_direction * ABS(ball->vel.y);
           }
-          ball->vel.y = ball_y_direction * ABS(ball->vel.y);
+          
           ball->vel = v2_add(ball->vel, v2_mul(ball->vel, ABS(player->vel.y) * 0.0009f));
           ball->vel.x *= -1;
         }
@@ -451,13 +469,14 @@ the arena */
           
           ball->pos.x = (opponent->pos.x - opponent->width/2.0f) - ball->width/2.0f - 1;
           
-          /* TODO: Debug - Why when the opponent hit the ball it goes to the wrong direction sometimes? */
           if (opponent->vel.y < 0) {
             ball_y_direction = -1;
-          } else {
+            ball->vel.y = ball_y_direction * ABS(ball->vel.y);
+          } else if (opponent->vel.y > 0.001) {
             ball_y_direction = 1;
+            ball->vel.y = ball_y_direction * ABS(ball->vel.y);
           }
-          ball->vel.y = ball_y_direction * ABS(ball->vel.y);
+          
           ball->vel = v2_add(ball->vel, v2_mul(ball->vel, ABS(opponent->vel.y) * 0.0009f));
           ball->vel.x *= -1;
         }
@@ -529,12 +548,14 @@ INTERNAL void level_horizontal_classic(GameBackBuffer *back_buffer, GameInput *i
     state->game_level.is_running = TRUE;
     state->game_level.time_elapsed = 0.0f;
     
+    v2_zero(&state->player.vel);
     state->player.pos.x = level_bounding_rect_width / 2.0f;
     state->player.pos.y = level_bounding_rect_height - 15;
     state->player.width = 70;
     state->player.height = 12;
     
-    state->player.pos.x = level_bounding_rect_width / 2.0f;
+    v2_zero(&state->opponent.vel);
+    state->opponent.pos.x = level_bounding_rect_width / 2.0f;
     state->opponent.pos.y = 15;
     state->opponent.width = 70;
     state->opponent.height = 12;
@@ -724,10 +745,11 @@ it's a copy-pasta of the classic level */
           
           if (player->vel.x < 0) {
             ball_x_direction = -1;
-          } else {
+            ball->vel.x = ball_x_direction * ABS(ball->vel.x);
+          } else if (player->vel.x > 0.001) {
             ball_x_direction = 1;
+            ball->vel.x = ball_x_direction * ABS(ball->vel.x);
           }
-          ball->vel.x = ball_x_direction * ABS(ball->vel.x);
           ball->vel = v2_add(ball->vel, v2_mul(ball->vel, ABS(player->vel.x) * 0.0009f));
           ball->vel.y *= -1;
         }
@@ -747,14 +769,14 @@ it's a copy-pasta of the classic level */
           
           ball->pos.y = (opponent->pos.y + opponent->height/2.0f) + (ball->height/2.0f) + 1;
           
-          /* TODO: Debug - Why when the opponent hit the ball it goes to the wrong direction sometimes? */
           if (opponent->vel.x < 0) {
             ball_x_direction = -1;
-          } else {
+            ball->vel.x = ball_x_direction * ABS(ball->vel.x);
+          } else if (opponent->vel.x > 0.001) {
             ball_x_direction = 1;
+            ball->vel.x = ball_x_direction * ABS(ball->vel.x);
           }
-          ball->vel.x = ball_x_direction * ABS(ball->vel.x);
-          /* ball->vel = v2_add(ball->vel, v2_mul(ball->vel, ABS(opponent->vel.x) * 0.0009f)); */
+          ball->vel = v2_add(ball->vel, v2_mul(ball->vel, ABS(opponent->vel.x) * 0.0009f));
           ball->vel.y *= -1;
         }
       }
@@ -772,7 +794,7 @@ it's a copy-pasta of the classic level */
         state->game_level.time_elapsed = 0.0f;
         state->game_level.is_running = FALSE;
         state->game_level.is_initialized = FALSE;
-        state->game_level.id = LEVEL_ID_END; /* TODO: Next level - Level transition goes here */
+        state->game_level.id = LEVEL_ID_END; /* @IMPORTANT: End screen */
       }
       
       state->score_rect_x = level_bounding_rect_width/2.0f;
