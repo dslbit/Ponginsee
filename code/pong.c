@@ -1,8 +1,5 @@
 /*
 -* TODO LIST:
--*  |_-> Render debug entity function - draw based on entity type with game
--*  resources or base color e.g. renderer_debug_entity(back_buffer, entity)
--*
 -*  |_-> Simplify the score calculation - I don't want to change the logic
 -*  of every level when changing something basic in the 'game_level' struct
 -*
@@ -132,7 +129,7 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
       state->is_showing_paused_screen = TRUE;
       
       /* TODO: Better background clear - Also add TRANSPARENCY here */
-      draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, state->background_color_paused);
+      renderer_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, state->background_color_paused);
     }
     return;
   }
@@ -183,7 +180,7 @@ INTERNAL void level_null(GameBackBuffer *back_buffer, GameInput *input, GameStat
   /* Null level: rendering */
   {
     /* TODO: Better background clear */
-    draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, state->background_color);
+    renderer_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, state->background_color);
   }
 }
 
@@ -231,13 +228,13 @@ INTERNAL void level_test(GameBackBuffer *back_buffer, GameInput *input, GameStat
   /* Test level: render */
   {
     /* TODO: Better background clear */
-    draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, state->background_color);
+    renderer_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, state->background_color);
     
     /* Box in the middle of the screen */
-    draw_filled_rect(back_buffer, state->box.pos.x, state->box.pos.y, state->box.width, state->box.height, state->box.color);
+    renderer_filled_rect(back_buffer, state->box.pos.x, state->box.pos.y, state->box.width, state->box.height, state->box.color);
     
     /* Rect at mouse position */
-    draw_filled_rect(back_buffer, state->rect.pos.x, state->rect.pos.y, state->rect.width, state->rect.height, state->rect.color);
+    renderer_filled_rect(back_buffer, state->rect.pos.x, state->rect.pos.y, state->rect.width, state->rect.height, state->rect.color);
   }
 }
 
@@ -512,26 +509,27 @@ the arena */
       color_score = color_create_from_hex(0xefd081ff);
       
       /* TODO: Better background clear */
-      draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, state->background_color);
+      renderer_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, state->background_color);
       
       /* Classic level arena middle line - Red: simulation not running, White: running */
       if (!state->game_level.is_running) {
-        draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, LEVEL_CLASSIC_MIDDLE_LINE_WIDTH, CAST(F32) back_buffer->height, color_middle_line_red);
+        renderer_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, LEVEL_CLASSIC_MIDDLE_LINE_WIDTH, CAST(F32) back_buffer->height, color_middle_line_red);
       } else { /* game level is running */
-        draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, LEVEL_CLASSIC_MIDDLE_LINE_WIDTH, CAST(F32) back_buffer->height, color_middle_line_white);
+        renderer_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, LEVEL_CLASSIC_MIDDLE_LINE_WIDTH, CAST(F32) back_buffer->height, color_middle_line_white);
       }
       
       /* New score representation */
-      draw_filled_rect(back_buffer, state->score_rect_x, state->score_rect_y, state->score_rect_width, state->score_rect_height, color_score);
+      renderer_filled_rect(back_buffer, state->score_rect_x, state->score_rect_y, state->score_rect_width, state->score_rect_height, color_score);
       
       /* Ball (rect) representation - @IDEIA: change color if it's FAST */
-      draw_filled_rect(back_buffer, state->ball.pos.x, state->ball.pos.y, state->ball.width, state->ball.height, state->ball.color);
+      //draw_filled_rect(back_buffer, state->ball.pos.x, state->ball.pos.y, state->ball.width, state->ball.height, state->ball.color);
+      renderer_debug_entity(back_buffer, &state->ball);
       
       /* Player (rect) representation - @IDEIA: change color when moving */
-      draw_filled_rect(back_buffer, state->player.pos.x, state->player.pos.y, state->player.width, state->player.height, state->player.color);
+      renderer_debug_entity(back_buffer, &state->player);
       
       /* Opponent (rect) representation - @IDEIA: change color when moving */
-      draw_filled_rect(back_buffer, state->opponent.pos.x, state->opponent.pos.y, state->opponent.width, state->opponent.height, state->opponent.color);
+      renderer_debug_entity(back_buffer, &state->opponent);
     }
   }
 }
@@ -811,26 +809,26 @@ it's a copy-pasta of the classic level */
       color_score = color_create_from_hex(0xefd081ff);
       
       /* TODO: Better background clear */
-      draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, state->background_color);
+      renderer_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, state->background_color);
       
       /* Classic level arena middle line - Red: simulation not running, White: running */
       if (!state->game_level.is_running) {
-        draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, LEVEL_HORIZONTAL_CLASSIC_MIDDLE_LINE_HEIGHT, color_middle_line_red);
+        renderer_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, LEVEL_HORIZONTAL_CLASSIC_MIDDLE_LINE_HEIGHT, color_middle_line_red);
       } else { /* game level is running */
-        draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, LEVEL_HORIZONTAL_CLASSIC_MIDDLE_LINE_HEIGHT, color_middle_line_white);
+        renderer_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, LEVEL_HORIZONTAL_CLASSIC_MIDDLE_LINE_HEIGHT, color_middle_line_white);
       }
       
       /* New score representation - @IDEIA: Draw the remaining space even though is greater than bounding box? */
-      draw_filled_rect(back_buffer, state->score_rect_x, state->score_rect_y, state->score_rect_width, state->score_rect_height, color_score);
-      
-      /* Player (rect) representation - @IDEIA: change color when moving */
-      draw_filled_rect(back_buffer, state->player.pos.x, state->player.pos.y, state->player.width, state->player.height, state->player.color);
-      
-      /* Opponent (rect) representation - @IDEIA: change color when moving */
-      draw_filled_rect(back_buffer, state->opponent.pos.x, state->opponent.pos.y, state->opponent.width, state->opponent.height, state->opponent.color);
+      renderer_filled_rect(back_buffer, state->score_rect_x, state->score_rect_y, state->score_rect_width, state->score_rect_height, color_score);
       
       /* Ball (rect) representation - @IDEIA: change color if it's FAST */
-      draw_filled_rect(back_buffer, state->ball.pos.x, state->ball.pos.y, state->ball.width, state->ball.height, state->ball.color);
+      renderer_debug_entity(back_buffer, &state->ball);
+      
+      /* Player (rect) representation - @IDEIA: change color when moving */
+      renderer_debug_entity(back_buffer, &state->player);
+      
+      /* Opponent (rect) representation - @IDEIA: change color when moving */
+      renderer_debug_entity(back_buffer, &state->opponent);
     }
   }
 }
@@ -866,7 +864,7 @@ INTERNAL void level_end(GameBackBuffer *back_buffer, GameInput *input, GameState
     end_background_color = color_create_from_hex(0xf09548ff);
     
     /* TODO: Better background clear */
-    draw_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, end_background_color);
+    renderer_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, end_background_color);
   }
 }
 

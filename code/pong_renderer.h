@@ -3,18 +3,18 @@
 
 EXTERN_OPEN /* extern "C" { */
 
-INTERNAL void draw_pixel(GameBackBuffer *back_buffer, S32 x, S32 y, GameColor color) {
+INTERNAL void renderer_pixel(GameBackBuffer *back_buffer, S32 x, S32 y, GameColor color) {
   U32 *pixel;
   U32 color_u32;
   
-  if (x > back_buffer->width || x < 0) return;
-  if (y > back_buffer->height || y < 0) return;
+  if (x >= back_buffer->width || x < 0) return;
+  if (y >= back_buffer->height || y < 0) return;
   color_u32 = ( (round_f32_to_u32(color.a * 255.0f) << 24) | (round_f32_to_u32(color.r * 255.0f) << 16) | (round_f32_to_u32(color.g * 255.0f) << 8) | (round_f32_to_u32(color.b * 255.0f) << 0) );
   pixel = CAST(U32 *) ((CAST(U8 *) back_buffer->memory) + (y * back_buffer->stride) + (x * back_buffer->bytes_per_pixel));
   *pixel = color_u32; /* AARRGGBB */
 }
 
-INTERNAL void draw_filled_rect(GameBackBuffer *back_buffer, F32 x, F32 y, F32 width, F32 height, GameColor color) {
+INTERNAL void renderer_filled_rect(GameBackBuffer *back_buffer, F32 x, F32 y, F32 width, F32 height, GameColor color) {
   S32 i, j;
   S32 start_x, start_y, end_x, end_y;
   U32 *pixel;
@@ -47,6 +47,10 @@ INTERNAL void draw_filled_rect(GameBackBuffer *back_buffer, F32 x, F32 y, F32 wi
       pixel++;
     }
   }
+}
+
+INTERNAL INLINE void renderer_debug_entity(GameBackBuffer *back_buffer, Entity *entity) {
+  renderer_filled_rect(back_buffer, entity->pos.x, entity->pos.y, entity->width, entity->height, entity->color);
 }
 
 EXTERN_CLOSE /* } */
