@@ -1,4 +1,4 @@
-#include "pong.c"
+#include "..\game\pong.c"
 
 /*
 -* TODO: Cleanup Win32 locals?

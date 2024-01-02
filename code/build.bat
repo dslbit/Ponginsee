@@ -1,7 +1,7 @@
 @echo off
 
-set win32_file=..\code\win32_pong.c
-set game_file=..\code\pong.c
+set win32_file=..\code\platform\win32_pong.c
+set game_file=..\code\game\pong.c
 
 set common_debug_compiler_flags=/DWIN32_DEBUG=1 /DPONG_DEBUG=1 /Od /Z7
 set common_compiler_flags=/nologo /FC /W3 /WX /Oi /utf-8 /fp:precise
