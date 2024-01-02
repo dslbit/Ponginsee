@@ -218,6 +218,7 @@ INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wp
       global_state.front_buffer_yoffset = 0;
     } break;
     
+    /* @IMPORTANT: This will not work properly if the front buffer is resized - TODO: Full screen mouse position handling, maybe set cursor pos in middle of the monitor and draw a virtual cursor that moves based on cursor delta */
     case WM_MOUSEMOVE: {
       game_input->mouse_pos.x = CAST(F32) GET_X_LPARAM(lparam);
       game_input->mouse_pos.y = CAST(F32) GET_Y_LPARAM(lparam);
@@ -484,9 +485,10 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
   /* Game window message loop */
   {
     MSG window_msg = {0};
-    GameBackBuffer game_back_buffer = {0};
-    GameInput game_input = {0};
-    GameState game_state = {0};
+    GameMemory game_memory = {0};
+    GameBackBuffer *game_back_buffer;
+    GameInput *game_input;
+    GameState *game_state;
     Win32GameCode game_code = {0};
     /* @Cleanup: Win32 layer */
     LARGE_INTEGER current_perf_counter = {0}, last_perf_counter = {0}, perf_frequency = {0};
@@ -496,8 +498,39 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
     wchar_t game_dll_full_path[MAX_PATH] = {0}, game_temp_dll_full_path[MAX_PATH] = {0}, lock_pdb_full_path[MAX_PATH] = {0};
     S32 monitor_refresh_rate;
     
+    /* Asks for memory to be used by the game */
+    {
+      game_memory.max_size = MEGABYTE(50);
+      game_memory.address = VirtualAlloc(0, game_memory.max_size, (MEM_RESERVE | MEM_COMMIT), PAGE_READWRITE);
+      
+      /* pushing 'GameBackBuffer' to game memory */
+      {
+        U64 game_back_buffer_size;
+        
+        game_back_buffer_size = sizeof(GameBackBuffer);
+        game_back_buffer = CAST(GameBackBuffer *) game_memory_push(&game_memory, game_back_buffer_size);
+      }
+      
+      /* pushing 'GameInput' to game memory */
+      {
+        U64 game_input_size;
+        
+        game_input_size = sizeof(GameInput);
+        game_input = CAST(GameInput *) game_memory_push(&game_memory, game_input_size);
+      }
+      
+      /* pushing 'GameState' to game memory */
+      {
+        U64 game_state_size;
+        
+        game_state_size = sizeof(GameState);
+        game_state = CAST(GameState *) game_memory_push(&game_memory, game_state_size);
+      }
+      
+    }
+    
     /* Pass 'game_input' to main window callback */
-    SetWindowLongPtrW(window, GWLP_USERDATA, CAST(LONG_PTR) &game_input);
+    SetWindowLongPtrW(window, GWLP_USERDATA, CAST(LONG_PTR) game_input);
     
     /* Get the monitor refresh rate */
     {
@@ -555,8 +588,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
       {
         int i;
         
-        for (i = 0; i < ARRAY_COUNT(game_input.player1.buttons); ++i) {
-          game_input.player1.buttons[i].released = FALSE;
+        for (i = 0; i < ARRAY_COUNT(game_input->player1.buttons); ++i) {
+          game_input->player1.buttons[i].released = FALSE;
         }
       }
       
@@ -581,20 +614,20 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
         LOCAL int release_dc_result;
         HDC window_dc;
         
-        game_back_buffer.width = global_state.back_buffer.width;
-        game_back_buffer.height = global_state.back_buffer.height;
-        game_back_buffer.bytes_per_pixel = WIN32_BACK_BUFFER_BYTES_PER_PIXEL;
-        game_back_buffer.stride = game_back_buffer.width * game_back_buffer.bytes_per_pixel;
-        game_back_buffer.memory = global_state.back_buffer.memory;
-        game_input.dt = dt;
-        game_code.update_and_render(&game_back_buffer, &game_input, &game_state);
+        game_back_buffer->width = global_state.back_buffer.width;
+        game_back_buffer->height = global_state.back_buffer.height;
+        game_back_buffer->bytes_per_pixel = WIN32_BACK_BUFFER_BYTES_PER_PIXEL;
+        game_back_buffer->stride = game_back_buffer->width * game_back_buffer->bytes_per_pixel;
+        game_back_buffer->memory = global_state.back_buffer.memory;
+        game_input->dt = dt;
+        game_code.update_and_render(game_back_buffer, game_input, game_state);
         
         /* Display the 'back_buffer' in window */
         {
           window_dc = GetDC(window); /* NOTE: Maybe this isn't necessary at all, since I'll do the rendering myself, I don't really need to release the DC everyframe. - @IMPORTANT: Investigate. */
           /*ASSERT(window_dc != 0);*/
           /* NOTE: BitBlt is faster than SctretchDIBits, maybe, in the future, change to BitBlt and do a bitmap resize by hand for the 'front buffer'? */
-          StretchDIBits(window_dc, global_state.front_buffer_xoffset, global_state.front_buffer_yoffset, global_state.front_buffer_width, global_state.front_buffer_height, 0, 0, game_back_buffer.width, game_back_buffer.height, game_back_buffer.memory, &global_state.back_buffer.bmp_info, DIB_RGB_COLORS, SRCCOPY);
+          StretchDIBits(window_dc, global_state.front_buffer_xoffset, global_state.front_buffer_yoffset, global_state.front_buffer_width, global_state.front_buffer_height, 0, 0, game_back_buffer->width, game_back_buffer->height, game_back_buffer->memory, &global_state.back_buffer.bmp_info, DIB_RGB_COLORS, SRCCOPY);
           if (window_dc != 0) { /* This check exist's because when the window minimized this is 0 */
             release_dc_result = ReleaseDC(window, window_dc);
             ASSERT(release_dc_result != 0, L"Windows failed to release the main window device context!");

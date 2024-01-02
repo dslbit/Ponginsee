@@ -1,5 +1,7 @@
 /*
 -* TODO LIST:
+-*  |_-> Platform-independent game memory!
+-*
 -*  |_-> Simplify the score calculation - I don't want to change the logic
 -*  of every level when changing something basic in the 'game_level' struct
 -*
@@ -17,10 +19,10 @@
 -*  |_-> Save progress? - IDK how crazy this will get, so do it only if it's
 -*  needed
 -*
--*  |_-> Figure out text rendering
+-*  |_-> Figure out text rendering (Bitmap & TrueType)
 -*   |_-> Show debug info in-game
 -*  |_-> Figure out the sound engine
--*  |_-> Platform-independent: game memory, sound output, file I/O
+-*  |_-> Platform-independent: sound output, file I/O
 */
 
 #include "pong_base.h"
@@ -31,6 +33,7 @@
 #include "pong_level.h"
 #include "pong_platform.h"
 #include "pong_renderer.h"
+#include "pong_memory.h"
 
 EXTERN_OPEN /* extern "C" { */
 

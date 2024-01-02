@@ -1,6 +1,10 @@
 #ifndef PONG_PLATFORM_H
 #define PONG_PLATFORM_H
 
+#define KILOBYTE(_x) ((_x) * 1024LL)
+#define MEGABYTE(_x) (KILOBYTE((_x)) * 1024LL)
+#define GIGABYTE(_x) (MEGABYTE((_x)) * 1024LL)
+
 EXTERN_OPEN /* extern "C" { */
 
 typedef struct GameBackBuffer GameBackBuffer;
