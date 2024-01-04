@@ -109,4 +109,12 @@ typedef float    F32;
 typedef double   F64;
 #endif /* #if (__STDC_VERSION__ < 199901L) */
 
+INTERNAL INLINE void debug_zero_array(void *array, U64 size) { /* size in bytes */
+  U64 i;
+  
+  for (i = 0; i < size; ++i) {
+    *(CAST(U8 *)array + i) = 0;
+  }
+}
+
 #endif //PONG_BASE_H

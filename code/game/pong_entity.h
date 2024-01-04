@@ -17,6 +17,13 @@ struct EntityPlayer {
   F32 score_accumulation;
 };
 
+typedef struct EntityBall EntityBall;
+struct EntityBall {
+  F32 timer_trail_spawner; /* 0 = spawn a trail, then add some time to delay the next trail */
+  V2 trails[8]; /* circular buffer - it uses the help of 'trails_next' variable */
+  S32 trails_next; /* index to the next available trail V2 */
+};
+
 typedef struct Entity Entity;
 struct Entity {
   V2 pos;
@@ -31,6 +38,7 @@ struct Entity {
   EntityType entity_type;
   union {
     EntityPlayer player_data;
+    EntityBall ball_data;
   };
 };
 

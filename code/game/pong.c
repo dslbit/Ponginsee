@@ -1,14 +1,10 @@
 /*
 -* TODO LIST:
--*  |_-> Platform-independent game memory!
--*
--*  |_-> Simplify the score calculation - I don't want to change the logic
--*  of every level when changing something basic in the 'game_level' struct
--*
+-*  |_-> Simple linear blend of colors (for better ball trail too)
+-* 
 -*  |_-> Pull out the entity vs arena code? Maybe return a v2 -1 to 1 range to
 -*  identify where entity was before going out of bounds
 -*
--*  |_-> Simple linear blend of colors
 -*  |_-> Simple particle system
 -*  |_-> Simple start menu (Play, Quit) and pause menu (Return, Quit), no text
 -*  for now, just a visual representation
@@ -21,6 +17,7 @@
 -*
 -*  |_-> Figure out text rendering (Bitmap & TrueType)
 -*   |_-> Show debug info in-game
+-*  |_-> Debug simplified console
 -*  |_-> Figure out the sound engine
 -*  |_-> Platform-independent: sound output, file I/O
 */
@@ -249,6 +246,8 @@ INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameS
   
   /* Classic level: setup */
   if (!state->game_level.is_initialized) {
+    S32 i;
+    
     state->game_level.is_initialized = TRUE;
     state->game_level.is_running = TRUE;
     state->game_level.time_elapsed = 0.0f;
@@ -268,6 +267,9 @@ INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameS
     state->ball.pos.x = level_bounding_rect_width / 2.0f;
     state->ball.pos.y = level_bounding_rect_height / 2.0f;
     state->ball.vel = v2_create(-250.0f, -110.0f);
+    for (i = 0; i < ARRAY_COUNT(state->ball.ball_data.trails); ++i) {
+      state->ball.ball_data.trails[i] = state->ball.pos;
+    }
     
     /* NOTE: Render arena state again? */
   }
@@ -349,7 +351,16 @@ INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameS
       }
       
       ball->pos = v2_add(ball->pos, v2_mul(ball->vel, input->dt));
-      /* @IDEIA: Ball trail effect? */
+      ball->ball_data.timer_trail_spawner -= input->dt;
+      if (ball->ball_data.timer_trail_spawner <= 0.0f) {
+        ball->ball_data.timer_trail_spawner = 0;
+        ball->ball_data.timer_trail_spawner += 0.005f;
+        if (ball->ball_data.trails_next > ARRAY_COUNT(ball->ball_data.trails)) {
+          ball->ball_data.trails_next = 0;
+        }
+        ball->ball_data.trails[ball->ball_data.trails_next] = ball->pos;
+        ++ball->ball_data.trails_next;
+      }
     }
     
     /* Axis-aligned Collision - @IMPORTANT: make sure it's above the 'clear_background' */
@@ -523,6 +534,16 @@ the arena */
       
       /* New score representation */
       renderer_filled_rect(back_buffer, state->score_rect_x, state->score_rect_y, state->score_rect_width, state->score_rect_height, color_score);
+      
+      /* Ugly Ball trail (rect) representation - @IDEIA: change color if it's FAST */
+      {
+        S32 i;
+        
+        for (i = 0; i < ARRAY_COUNT(state->ball.ball_data.trails); ++i) {
+          renderer_filled_rect(back_buffer, state->ball.ball_data.trails[i].x, state->ball.ball_data.trails[i].y, state->ball.width, state->ball.height, color_create_from_hex(0xf1f1f1ff));
+        }
+        
+      }
       
       /* Ball (rect) representation - @IDEIA: change color if it's FAST */
       //draw_filled_rect(back_buffer, state->ball.pos.x, state->ball.pos.y, state->ball.width, state->ball.height, state->ball.color);
