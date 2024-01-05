@@ -1,7 +1,5 @@
 /*
 -* TODO LIST:
--*  |_-> Simple linear blend of colors (for better ball trail too)
--* 
 -*  |_-> Pull out the entity vs arena code? Maybe return a v2 -1 to 1 range to
 -*  identify where entity was before going out of bounds
 -*
@@ -196,13 +194,13 @@ INTERNAL void level_test(GameBackBuffer *back_buffer, GameInput *input, GameStat
     state->rect.pos.y = input->mouse_pos.y;
     state->rect.width = 300;
     state->rect.height = 21;
-    state->rect.color = color_create_from_hex(0x4995f3ff);
+    state->rect.color = color_create_from_hex(0xff000080);
     
     state->box.pos.x = (state->game_level.min_bounding_rect_x + state->game_level.max_bounding_rect_x) / 2.0f;
     state->box.pos.y = (state->game_level.min_bounding_rect_y + state->game_level.max_bounding_rect_y) / 2.0f;
     state->box.width = 120;
     state->box.height = 120;
-    state->box.color = color_create_from_hex(0xf79c88ff);
+    state->box.color = color_create_from_hex(0xffffffff);
   }
   
   /* Test level: update */
@@ -217,9 +215,9 @@ INTERNAL void level_test(GameBackBuffer *back_buffer, GameInput *input, GameStat
       is_colliding = collision_aabb_vs_aabb(state->rect.pos, state->rect.width, state->rect.height, state->box.pos, state->box.width, state->box.height);
       
       if (is_colliding) {
-        state->rect.color = color_create_from_hex(0x72deebff);
+        //state->rect.color = color_create_from_hex(0x72deebff);
       } else {
-        state->rect.color = color_create_from_hex(0x4995f3ff);
+        //state->rect.color = color_create_from_hex(0x4995f3ff);
       }
     }
     

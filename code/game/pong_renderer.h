@@ -37,12 +37,31 @@ INTERNAL void renderer_filled_rect(GameBackBuffer *back_buffer, F32 x, F32 y, F3
   if (end_y > back_buffer->height) end_y = back_buffer->height;
   
   /* pack floating point color representation to int */
+#if 0
   color_u32 = ( (round_f32_to_u32(color.a * 255.0f) << 24) | (round_f32_to_u32(color.r * 255.0f) << 16) | (round_f32_to_u32(color.g * 255.0f) << 8) | (round_f32_to_u32(color.b * 255.0f) << 0) );
+#endif
   
   /* start drawing */
   for (i = start_y; i < end_y; ++i) {
     pixel = CAST(U32 *) ((CAST(U8 *) back_buffer->memory) + (i * back_buffer->stride) + (start_x * back_buffer->bytes_per_pixel));
     for (j = start_x; j < end_x; ++j) {
+      F32 dest_r, dest_g, dest_b;
+      F32 r, g, b;
+      
+      dest_r = ((*pixel) >> 16 && 0xFF) / 255.0f;
+      dest_g = ((*pixel) >> 8 && 0xFF) / 255.0f;
+      dest_b = ((*pixel) >> 0 && 0xFF) / 255.0f;
+      
+#if 0
+      r = dest_r + color.a*(color.r - dest_r);
+      g = dest_b + color.a*(color.g - dest_g);
+      b = dest_g + color.a*(color.b - dest_b);
+#else
+      r = (1.0f - color.a) * dest_r + color.a*color.r;
+      g = (1.0f - color.a) * dest_g + color.a*color.g;
+      b = (1.0f - color.a) * dest_b + color.a*color.b;
+#endif
+      color_u32 = (0xff << 24) | (round_f32_to_u32(r * 255.0f) << 16) | (round_f32_to_u32(g * 255.0f) << 8) | (round_f32_to_u32(b * 255.0f) << 0);
       *pixel = color_u32;
       pixel++;
     }
