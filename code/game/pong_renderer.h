@@ -48,19 +48,14 @@ INTERNAL void renderer_filled_rect(GameBackBuffer *back_buffer, F32 x, F32 y, F3
       F32 dest_r, dest_g, dest_b;
       F32 r, g, b;
       
-      dest_r = ((*pixel) >> 16 && 0xFF) / 255.0f;
-      dest_g = ((*pixel) >> 8 && 0xFF) / 255.0f;
-      dest_b = ((*pixel) >> 0 && 0xFF) / 255.0f;
+      dest_r = ((*pixel) >> 16 & 0xFF) / 255.0f;
+      dest_g = ((*pixel) >> 8 & 0xFF) / 255.0f;
+      dest_b = ((*pixel) >> 0 & 0xFF) / 255.0f;
       
-#if 0
-      r = dest_r + color.a*(color.r - dest_r);
-      g = dest_b + color.a*(color.g - dest_g);
-      b = dest_g + color.a*(color.b - dest_b);
-#else
-      r = (1.0f - color.a) * dest_r + color.a*color.r;
-      g = (1.0f - color.a) * dest_g + color.a*color.g;
-      b = (1.0f - color.a) * dest_b + color.a*color.b;
-#endif
+      r = (1.0f - color.a)*dest_r + color.a*color.r;
+      g = (1.0f - color.a)*dest_g + color.a*color.g;
+      b = (1.0f - color.a)*dest_b + color.a*color.b;
+      
       color_u32 = (0xff << 24) | (round_f32_to_u32(r * 255.0f) << 16) | (round_f32_to_u32(g * 255.0f) << 8) | (round_f32_to_u32(b * 255.0f) << 0);
       *pixel = color_u32;
       pixel++;
