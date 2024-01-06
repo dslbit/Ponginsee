@@ -66,7 +66,7 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
     state->opponent.player_data.score_accumulation = 0.0f;
     
     state->ball = entity_create(ENTITY_TYPE_BLANK);
-    state->ball.color = color_create_from_hex(0x3ec54bff);
+    state->ball.color = color_create_from_hex(0x3ec54b60);
     state->ball.vel = v2_create(-250.0f, -110.0f);
     state->ball.width = 7;
     state->ball.height = 7;
@@ -244,8 +244,6 @@ INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameS
   
   /* Classic level: setup */
   if (!state->game_level.is_initialized) {
-    S32 i;
-    
     state->game_level.is_initialized = TRUE;
     state->game_level.is_running = TRUE;
     state->game_level.time_elapsed = 0.0f;
@@ -265,9 +263,6 @@ INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameS
     state->ball.pos.x = level_bounding_rect_width / 2.0f;
     state->ball.pos.y = level_bounding_rect_height / 2.0f;
     state->ball.vel = v2_create(-250.0f, -110.0f);
-    for (i = 0; i < ARRAY_COUNT(state->ball.ball_data.trails); ++i) {
-      state->ball.ball_data.trails[i] = state->ball.pos;
-    }
     
     /* NOTE: Render arena state again? */
   }
@@ -349,16 +344,42 @@ INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameS
       }
       
       ball->pos = v2_add(ball->pos, v2_mul(ball->vel, input->dt));
+      {
+        U64 trails_count;
+        Trail *trail;
+        S32 i;
+        
+        trails_count = ARRAY_COUNT(ball->ball_data.trails);
+        ball->ball_data.timer_trail_spawner -= input->dt;
+        if (ball->ball_data.timer_trail_spawner < 0) {
+          ball->ball_data.timer_trail_spawner = 0.00016f;
+          if (ball->ball_data.trails_next > trails_count) {
+            ball->ball_data.trails_next = 0;
+          }
+          trail = &ball->ball_data.trails[ball->ball_data.trails_next];
+          trail->pos = ball->pos;
+          trail->life = 0.45f * 10.0f;
+          ball->ball_data.trails_next++;
+        }
+        for (i = 0; i < trails_count; ++i) {
+          trail = &ball->ball_data.trails[i];
+          trail->life -= input->dt*10.0f;
+          if (trail->life < 0) trail->life = 0;
+        }
+      }
+      
+#if 0
       ball->ball_data.timer_trail_spawner -= input->dt;
       if (ball->ball_data.timer_trail_spawner <= 0.0f) {
-        ball->ball_data.timer_trail_spawner = 0;
-        ball->ball_data.timer_trail_spawner += 0.005f;
-        if (ball->ball_data.trails_next > ARRAY_COUNT(ball->ball_data.trails)) {
-          ball->ball_data.trails_next = 0;
+        ball->ball_data.timer_trail_spawner = 0.01f;
+        if (ball->ball_data.trails_next < 0) { /* circular buffer */
+          ball->ball_data.trails_next = ARRAY_COUNT(ball->ball_data.trails)-1;
+          debug_zero_array(ball->ball_data.trails, ARRAY_COUNT(ball->ball_data.trails));
         }
         ball->ball_data.trails[ball->ball_data.trails_next] = ball->pos;
-        ++ball->ball_data.trails_next;
+        --ball->ball_data.trails_next;
       }
+#endif 
     }
     
     /* Axis-aligned Collision - @IMPORTANT: make sure it's above the 'clear_background' */
@@ -533,12 +554,19 @@ the arena */
       /* New score representation */
       renderer_filled_rect(back_buffer, state->score_rect_x, state->score_rect_y, state->score_rect_width, state->score_rect_height, color_score);
       
-      /* Ugly Ball trail (rect) representation - @IDEIA: change color if it's FAST */
+      /* 'Not so ugly' Ball trail (rect) representation - @IDEIA: change color if it's FAST */
       {
         S32 i;
+        GameColor color_trail;
+        Trail *trail;
         
         for (i = 0; i < ARRAY_COUNT(state->ball.ball_data.trails); ++i) {
-          renderer_filled_rect(back_buffer, state->ball.ball_data.trails[i].x, state->ball.ball_data.trails[i].y, state->ball.width, state->ball.height, color_create_from_hex(0xf1f1f1ff));
+          trail = &state->ball.ball_data.trails[i];
+          if (trail->life > 0) {
+            color_trail = state->ball.color;
+            color_trail.a = (trail->life / 20.0f);
+            renderer_filled_rect(back_buffer, trail->pos.x, trail->pos.y, state->ball.width, state->ball.height, color_trail);
+          }
         }
         
       }
