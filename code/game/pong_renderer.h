@@ -9,8 +9,25 @@ INTERNAL void renderer_pixel(GameBackBuffer *back_buffer, S32 x, S32 y, GameColo
   
   if (x >= back_buffer->width || x < 0) return;
   if (y >= back_buffer->height || y < 0) return;
+#if 0
   color_u32 = ( (round_f32_to_u32(color.a * 255.0f) << 24) | (round_f32_to_u32(color.r * 255.0f) << 16) | (round_f32_to_u32(color.g * 255.0f) << 8) | (round_f32_to_u32(color.b * 255.0f) << 0) );
+#endif
   pixel = CAST(U32 *) ((CAST(U8 *) back_buffer->memory) + (y * back_buffer->stride) + (x * back_buffer->bytes_per_pixel));
+  /* linear alpha blending */
+  {
+    F32 dest_r, dest_g, dest_b;
+    F32 r, g, b;
+    
+    dest_r = ((*pixel) >> 16 & 0xff) / 255.0f;
+    dest_g = ((*pixel) >> 8 & 0xff) / 255.0f;
+    dest_b = ((*pixel) >> 0 & 0xff) / 255.0f;
+    
+    r = (1.0f - color.a)*dest_r + color.a*color.r;
+    g = (1.0f - color.a)*dest_g + color.a*color.g;
+    b = (1.0f - color.a)*dest_b + color.a*color.b;
+    
+    color_u32 = (0xff << 24) | (round_f32_to_u32(r * 255.0f) << 16) | (round_f32_to_u32(g * 255.0f) << 8) | (round_f32_to_u32(b * 255.0f) << 0);
+  }
   *pixel = color_u32; /* AARRGGBB */
 }
 
