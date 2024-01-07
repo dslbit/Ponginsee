@@ -23,12 +23,13 @@
 #include "pong_base.h"
 #include "pong_math.h"
 #include "pong_color.h"
+#include "pong_memory.h"
+#include "pong_particle.h"
 #include "pong_entity.h"
 #include "pong_collision.h"
 #include "pong_level.h"
 #include "pong_platform.h"
 #include "pong_renderer.h"
-#include "pong_memory.h"
 
 EXTERN_OPEN /* extern "C" { */
 
@@ -40,6 +41,10 @@ INTERNAL void level_horizontal_classic(GameBackBuffer *back_buffer, GameInput *i
 INTERNAL void level_end(GameBackBuffer *back_buffer, GameInput *input, GameState *state);
 
 GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
+  GameState *state;
+  
+  ASSERT(sizeof(GameState) < memory->max_size, L"NOT ENOUGH MEMORY!");
+  state = CAST(GameState *) memory->address;
   if (!state->is_initialized) {
     state->is_initialized = TRUE;
     
@@ -263,8 +268,7 @@ INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameS
     state->ball.pos.x = level_bounding_rect_width / 2.0f;
     state->ball.pos.y = level_bounding_rect_height / 2.0f;
     state->ball.vel = v2_create(-250.0f, -110.0f);
-    
-    /* NOTE: Render arena state again? */
+    /* TODO: adapt game_memory to create the ball particle system here */
   }
   
   /* Classic level: update and render */
@@ -367,19 +371,6 @@ INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameS
           if (trail->life < 0) trail->life = 0;
         }
       }
-      
-#if 0
-      ball->ball_data.timer_trail_spawner -= input->dt;
-      if (ball->ball_data.timer_trail_spawner <= 0.0f) {
-        ball->ball_data.timer_trail_spawner = 0.01f;
-        if (ball->ball_data.trails_next < 0) { /* circular buffer */
-          ball->ball_data.trails_next = ARRAY_COUNT(ball->ball_data.trails)-1;
-          debug_zero_array(ball->ball_data.trails, ARRAY_COUNT(ball->ball_data.trails));
-        }
-        ball->ball_data.trails[ball->ball_data.trails_next] = ball->pos;
-        --ball->ball_data.trails_next;
-      }
-#endif 
     }
     
     /* Axis-aligned Collision - @IMPORTANT: make sure it's above the 'clear_background' */

@@ -45,4 +45,4 @@ INTERNAL INLINE GameColor color_create_from_rgba(U8 r, U8 g, U8 b, U8 a) {
 
 EXTERN_CLOSE /* } */
 
-#endif //PONG_COLOR_H
+#endif /* PONG_COLOR_H */

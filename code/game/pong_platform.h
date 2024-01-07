@@ -61,7 +61,7 @@ struct GameState {
   B32 is_initialized;
   B32 is_paused;
   B32 is_showing_paused_screen;
-  
+  GameMemory game_memory;
   GameLevel game_level;
   F32 score_rect_x;
   F32 score_rect_y;
@@ -81,7 +81,7 @@ entities - Right? */
   Entity ball;
 };
 
-#define GAME_UPDATE_AND_RENDER_PROTOTYPE(_name) void _name(GameBackBuffer *back_buffer, GameInput *input, GameState *state)
+#define GAME_UPDATE_AND_RENDER_PROTOTYPE(_name) void _name(GameBackBuffer *back_buffer, GameInput *input, GameMemory *memory)
 typedef GAME_UPDATE_AND_RENDER_PROTOTYPE(GameUpdateAndRenderFuncType);
 
 GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render);

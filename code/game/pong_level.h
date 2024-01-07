@@ -32,4 +32,4 @@ struct GameLevel {
 
 EXTERN_CLOSE /* } */
 
-#endif //PONG_LEVEL_H
+#endif /* PONG_LEVEL_H */

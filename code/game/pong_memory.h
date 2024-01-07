@@ -5,7 +5,11 @@ EXTERN_OPEN /* extern "C" { */
 
 /*
 -* NOTE: If needed, implement memory arena separation, push struct and push
--* array macros for permanent storage
+-* array macros for permanent storage.
+-*
+-* I could separate the GameMemory into permanent_storage, and a temporary
+-* or transient storage. The temporary_storage could be cleared every level
+-* or something like that, it depends on the game.
 */
 
 typedef struct GameMemory GameMemory;
@@ -29,4 +33,4 @@ INTERNAL INLINE void *game_memory_push(GameMemory *mem, U64 push_size) {
 
 EXTERN_CLOSE /* } */
 
-#endif //PONG_MEMORY_H
+#endif /* PONG_MEMORY_H */

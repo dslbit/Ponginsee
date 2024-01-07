@@ -86,4 +86,4 @@ INTERNAL INLINE void renderer_debug_entity(GameBackBuffer *back_buffer, Entity *
 
 EXTERN_CLOSE /* } */
 
-#endif //PONG_RENDERER_H
+#endif /* PONG_RENDERER_H */

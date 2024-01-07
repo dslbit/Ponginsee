@@ -3,7 +3,6 @@
 
 EXTERN_OPEN /* extern "C" { */
 
-
 typedef enum EntityType EntityType;
 enum EntityType {
   ENTITY_TYPE_BLANK,
@@ -28,6 +27,7 @@ struct EntityBall {
   F32 timer_trail_spawner;
   Trail trails[32]; /* circular buffer - it uses the help of 'trails_next' variable */
   S32 trails_next; /* index to the next available trail V2 */
+  ParticleSystem particle_system;
 };
 
 typedef struct Entity Entity;
@@ -58,4 +58,4 @@ INTERNAL INLINE Entity entity_create(EntityType type) {
 
 EXTERN_CLOSE /* } */
 
-#endif //PONG_ENTITY_H
+#endif /* PONG_ENTITY_H */

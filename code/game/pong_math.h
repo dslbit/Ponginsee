@@ -97,4 +97,4 @@ INTERNAL INLINE F32 v2_mag_squared(V2 a) {
 }
 
 EXTERN_CLOSE /* } */
-#endif //PONG_MATH_H
+#endif /* PONG_MATH_H */

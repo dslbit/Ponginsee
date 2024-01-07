@@ -117,4 +117,4 @@ INTERNAL INLINE void debug_zero_array(void *array, U64 size) { /* size in bytes 
   }
 }
 
-#endif //PONG_BASE_H
+#endif /* PONG_BASE_H */

@@ -63,7 +63,7 @@ struct Win32GameCode {
 };
 
 typedef struct Win32State Win32State;
-struct Win32State {
+struct Win32State { /* TODO: add game memory info */
   B32 is_running; /* main game loop */
   B32 is_cursor_visible;
   B32 is_window_topmost;
@@ -503,6 +503,15 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
       game_memory.max_size = MEGABYTE(50);
       game_memory.address = VirtualAlloc(0, game_memory.max_size, (MEM_RESERVE | MEM_COMMIT), PAGE_READWRITE);
       
+      /* pushing 'GameState' to game memory */
+      {
+        U64 game_state_size;
+        
+        ASSERT(game_memory.current_size == 0, L"'game_state' should be the first in 'game_memory'!"); /* @IMPORTANT: This is needed because in the game I cast the game_state pointer to the base address of the game memory */
+        game_state_size = sizeof(GameState);
+        game_state = CAST(GameState *) game_memory_push(&game_memory, game_state_size);
+      }
+      
       /* pushing 'GameBackBuffer' to game memory */
       {
         U64 game_back_buffer_size;
@@ -517,14 +526,6 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
         
         game_input_size = sizeof(GameInput);
         game_input = CAST(GameInput *) game_memory_push(&game_memory, game_input_size);
-      }
-      
-      /* pushing 'GameState' to game memory */
-      {
-        U64 game_state_size;
-        
-        game_state_size = sizeof(GameState);
-        game_state = CAST(GameState *) game_memory_push(&game_memory, game_state_size);
       }
       
     }
@@ -620,7 +621,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
         game_back_buffer->stride = game_back_buffer->width * game_back_buffer->bytes_per_pixel;
         game_back_buffer->memory = global_state.back_buffer.memory;
         game_input->dt = dt;
-        game_code.update_and_render(game_back_buffer, game_input, game_state);
+        game_code.update_and_render(game_back_buffer, game_input, &game_memory);
         
         /* Display the 'back_buffer' in window */
         {
