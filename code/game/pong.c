@@ -44,7 +44,7 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
     state->is_initialized = TRUE;
     
     state->background_color = color_create_from_hex(0x1f1723ff);
-    state->background_color_paused = color_create_from_hex(0x3c2f52ff);
+    state->background_color_paused = color_create_from_hex(0xefd08180);
     /* NOTE: Maybe this should be moved to the level update function
         initialization place */
     state->game_level.id = LEVEL_ID_NULL;
@@ -126,7 +126,7 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
     if (!state->is_showing_paused_screen) {
       state->is_showing_paused_screen = TRUE;
       
-      /* TODO: Better background clear - Also add TRANSPARENCY here */
+      /* TODO: Better background clear */
       renderer_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, state->background_color_paused);
     }
     return;
