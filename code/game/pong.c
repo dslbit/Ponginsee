@@ -249,6 +249,8 @@ INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameS
   
   /* Classic level: setup */
   if (!state->game_level.is_initialized) {
+    S32 i;
+    
     state->game_level.is_initialized = TRUE;
     state->game_level.is_running = TRUE;
     state->game_level.time_elapsed = 0.0f;
@@ -268,6 +270,13 @@ INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameS
     state->ball.pos.x = level_bounding_rect_width / 2.0f;
     state->ball.pos.y = level_bounding_rect_height / 2.0f;
     state->ball.vel = v2_create(-250.0f, -110.0f);
+    for (i = 0; i < ARRAY_COUNT(state->ball.ball_data.trails); ++i) {
+      Trail *trail;
+      
+      trail = &state->ball.ball_data.trails[i];
+      trail->pos = state->ball.pos;
+      trail->life = 0.0f;
+    }
     /* TODO: adapt game_memory to create the ball particle system here */
   }
   
