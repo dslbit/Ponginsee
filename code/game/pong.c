@@ -353,7 +353,7 @@ INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameS
         ball->ball_data.timer_trail_spawner -= input->dt;
         if (ball->ball_data.timer_trail_spawner < 0) {
           ball->ball_data.timer_trail_spawner = 0.00016f;
-          if (ball->ball_data.trails_next > trails_count) {
+          if (ball->ball_data.trails_next >= trails_count) {
             ball->ball_data.trails_next = 0;
           }
           trail = &ball->ball_data.trails[ball->ball_data.trails_next];
