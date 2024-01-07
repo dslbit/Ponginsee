@@ -84,6 +84,16 @@ INTERNAL INLINE void renderer_debug_entity(GameBackBuffer *back_buffer, Entity *
   renderer_filled_rect(back_buffer, entity->pos.x, entity->pos.y, entity->width, entity->height, entity->color);
 }
 
+INTERNAL INLINE void renderer_debug_particles(GameBackBuffer *back_buffer, ParticleSystem *ps) {
+  S32 i;
+  Particle *p;
+  
+  for (i = 0; i < ps->particles_count; ++i) {
+    p = &ps->particles[i];
+    renderer_filled_rect(back_buffer, p->pos.x, p->pos.y, p->width, p->height, p->color);
+  }
+}
+
 EXTERN_CLOSE /* } */
 
 #endif /* PONG_RENDERER_H */

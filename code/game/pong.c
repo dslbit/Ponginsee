@@ -34,11 +34,11 @@
 EXTERN_OPEN /* extern "C" { */
 
 /* NOTE: What if other levels have the same movement code? */
-INTERNAL void level_null(GameBackBuffer *back_buffer, GameInput *input, GameState *state);
-INTERNAL void level_test(GameBackBuffer *back_buffer, GameInput *input, GameState *state);
-INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameState *state);
-INTERNAL void level_horizontal_classic(GameBackBuffer *back_buffer, GameInput *input, GameState *state);
-INTERNAL void level_end(GameBackBuffer *back_buffer, GameInput *input, GameState *state);
+INTERNAL void level_null(GameBackBuffer *back_buffer, GameInput *input, GameMemory *memory);
+INTERNAL void level_test(GameBackBuffer *back_buffer, GameInput *input, GameMemory *memory);
+INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameMemory *memory);
+INTERNAL void level_horizontal_classic(GameBackBuffer *back_buffer, GameInput *input, GameMemory *memory);
+INTERNAL void level_end(GameBackBuffer *back_buffer, GameInput *input, GameMemory *memory);
 
 GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
   GameState *state;
@@ -140,23 +140,23 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
   /* NOTE: Level update and render */
   switch (state->game_level.id) {
     case LEVEL_ID_NULL: {
-      level_null(back_buffer, input, state);
+      level_null(back_buffer, input, memory);
     } break;
     
     case LEVEL_ID_TEST: {
-      level_test(back_buffer, input, state);
+      level_test(back_buffer, input, memory);
     } break;
     
     case LEVEL_ID_CLASSIC: {
-      level_classic(back_buffer, input, state);
+      level_classic(back_buffer, input, memory);
     } break;
     
     case LEVEL_ID_HORIZONTAL_CLASSIC: {
-      level_horizontal_classic(back_buffer, input, state);
+      level_horizontal_classic(back_buffer, input, memory);
     } break;
     
     case LEVEL_ID_END: {
-      level_end(back_buffer, input, state);
+      level_end(back_buffer, input, memory);
     } break;
     
     default: {
@@ -165,7 +165,10 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
   }
 }
 
-INTERNAL void level_null(GameBackBuffer *back_buffer, GameInput *input, GameState *state) {
+INTERNAL void level_null(GameBackBuffer *back_buffer, GameInput *input, GameMemory *memory) {
+  GameState *state;
+  
+  state = CAST(GameState *) memory->address;
   /* Null level: setup */
   if (!state->game_level.is_initialized) {
     state->game_level.is_initialized = TRUE;
@@ -187,8 +190,10 @@ INTERNAL void level_null(GameBackBuffer *back_buffer, GameInput *input, GameStat
   }
 }
 
-INTERNAL void level_test(GameBackBuffer *back_buffer, GameInput *input, GameState *state) {
+INTERNAL void level_test(GameBackBuffer *back_buffer, GameInput *input, GameMemory *memory) {
+  GameState *state;
   
+  state = CAST(GameState *) memory->address;
   /* Test level: setup */
   if (!state->game_level.is_initialized) {
     state->game_level.is_initialized = TRUE;
@@ -241,9 +246,11 @@ INTERNAL void level_test(GameBackBuffer *back_buffer, GameInput *input, GameStat
   }
 }
 
-INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameState *state) {
+INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameMemory *memory) {
+  GameState *state;
   F32 level_bounding_rect_width, level_bounding_rect_height;
   
+  state = CAST(GameState *) memory->address;
   level_bounding_rect_width = CAST(F32) (state->game_level.max_bounding_rect_x - state->game_level.min_bounding_rect_x);
   level_bounding_rect_height = CAST(F32) (state->game_level.max_bounding_rect_y - state->game_level.min_bounding_rect_y);
   
@@ -277,11 +284,14 @@ INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameS
       trail->pos = state->ball.pos;
       trail->life = 0.0f;
     }
-    /* TODO: adapt game_memory to create the ball particle system here */
+    state->ball.ball_data.particle_system = particle_system_create(memory, FALSE, state->ball.pos, FALSE, 0, 16, 10, 10, color_create_from_hex(0xbcb0b340));
   }
   
   /* Classic level: update and render */
   if (state->game_level.is_running) { /* level is running */
+    /* Clearing some data */
+    state->ball.ball_data.particle_system.is_ready_for_emission = FALSE; /* only true when collision happens with player, opponent and arena */
+    
     /* Player movement code */
     {
       Entity *player;
@@ -430,12 +440,14 @@ INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameS
         if (ball_hit_point_top < 0) {
           ball->pos.y = ball->height/2.0f;
           ball->vel.y *= -1;
+          ball->ball_data.particle_system.is_ready_for_emission = TRUE;
         }
         
         ball_hit_point_bottom = CAST(S32) (ball->pos.y + ball->height/2.0f);
         if (ball_hit_point_bottom  > level_bounding_rect_height) {
           ball->pos.y = level_bounding_rect_height - ball->height/2.0f;
           ball->vel.y *= -1;
+          ball->ball_data.particle_system.is_ready_for_emission = TRUE;
         }
         
         ball_hit_point_left = CAST(S32) (ball->pos.x - ball->width/2.0f);
@@ -482,6 +494,7 @@ the arena */
           
           ball->vel = v2_add(ball->vel, v2_mul(ball->vel, ABS(player->vel.y) * 0.0009f));
           ball->vel.x *= -1;
+          ball->ball_data.particle_system.is_ready_for_emission = TRUE;
         }
       }
       
@@ -509,9 +522,15 @@ the arena */
           
           ball->vel = v2_add(ball->vel, v2_mul(ball->vel, ABS(opponent->vel.y) * 0.0009f));
           ball->vel.x *= -1;
+          ball->ball_data.particle_system.is_ready_for_emission = TRUE;
         }
       }
-      
+    }
+    
+    /* @Test -  particles update after collision */
+    {
+      state->ball.ball_data.particle_system.pos = state->ball.pos;
+      particle_system_update(&state->ball.ball_data.particle_system);
     }
     
     /* Re-imagining player score / score progress - Using the arena middle line as a 'load bar' to next levels */
@@ -554,6 +573,13 @@ the arena */
       /* New score representation */
       renderer_filled_rect(back_buffer, state->score_rect_x, state->score_rect_y, state->score_rect_width, state->score_rect_height, color_score);
       
+      /* Ball particle hit */
+      {
+        if (state->ball.ball_data.particle_system.is_ready_for_emission) {
+          renderer_debug_particles(back_buffer, &state->ball.ball_data.particle_system);
+        }
+      }
+      
       /* 'Not so ugly' Ball trail (rect) representation - @IDEIA: change color if it's FAST */
       {
         S32 i;
@@ -584,9 +610,11 @@ the arena */
   }
 }
 
-INTERNAL void level_horizontal_classic(GameBackBuffer *back_buffer, GameInput *input, GameState *state) {
+INTERNAL void level_horizontal_classic(GameBackBuffer *back_buffer, GameInput *input, GameMemory *memory) {
+  GameState *state;
   F32 level_bounding_rect_width, level_bounding_rect_height;
   
+  state = CAST(GameState *) memory->address;
   level_bounding_rect_width = CAST(F32) (state->game_level.max_bounding_rect_x - state->game_level.min_bounding_rect_x);
   level_bounding_rect_height = CAST(F32) (state->game_level.max_bounding_rect_y - state->game_level.min_bounding_rect_y);
   
@@ -884,7 +912,10 @@ it's a copy-pasta of the classic level */
 }
 
 /* NOTE: Credits? IDK */
-INTERNAL void level_end(GameBackBuffer *back_buffer, GameInput *input, GameState *state) {
+INTERNAL void level_end(GameBackBuffer *back_buffer, GameInput *input, GameMemory *memory) {
+  GameState *state;
+  
+  state = CAST(GameState *) memory->address;
   /* End level: setup */
   if (!state->game_level.is_initialized) {
     state->game_level.is_initialized = TRUE;
