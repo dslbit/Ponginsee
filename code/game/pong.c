@@ -1,9 +1,10 @@
 /*
 -* TODO LIST:
+-*  |_-> Simple particle system
+-*
 -*  |_-> Pull out the entity vs arena code? Maybe return a v2 -1 to 1 range to
 -*  identify where entity was before going out of bounds
 -*
--*  |_-> Simple particle system
 -*  |_-> Simple start menu (Play, Quit) and pause menu (Return, Quit), no text
 -*  for now, just a visual representation
 -*
@@ -18,6 +19,12 @@
 -*  |_-> Debug simplified console
 -*  |_-> Figure out the sound engine
 -*  |_-> Platform-independent: sound output, file I/O
+-*
+-* NOTE:
+-*  |_-> When I press the pause button when go fullscreen on/off, the 'back buffer' is not rendered.
+-* 
+-* 
+-* 
 */
 
 #include "pong_base.h"
@@ -225,9 +232,9 @@ INTERNAL void level_test(GameBackBuffer *back_buffer, GameInput *input, GameMemo
       is_colliding = collision_aabb_vs_aabb(state->rect.pos, state->rect.width, state->rect.height, state->box.pos, state->box.width, state->box.height);
       
       if (is_colliding) {
-        //state->rect.color = color_create_from_hex(0x72deebff);
+        /*state->rect.color = color_create_from_hex(0x72deebff);*/
       } else {
-        //state->rect.color = color_create_from_hex(0x4995f3ff);
+        /*state->rect.color = color_create_from_hex(0x4995f3ff);*/
       }
     }
     
@@ -284,13 +291,13 @@ INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameM
       trail->pos = state->ball.pos;
       trail->life = 0.0f;
     }
-    state->ball.ball_data.particle_system = particle_system_create(memory, FALSE, state->ball.pos, FALSE, 0, 16, 10, 10, color_create_from_hex(0xbcb0b340));
+    state->ball.ball_data.particle_system = particle_system_create(memory, FALSE, state->ball.pos, FALSE, 0, 16, 4, 4, color_create_from_hex(0xbcb0b340));
   }
   
   /* Classic level: update and render */
   if (state->game_level.is_running) { /* level is running */
     /* Clearing some data */
-    state->ball.ball_data.particle_system.is_ready_for_emission = FALSE; /* only true when collision happens with player, opponent and arena */
+    {}
     
     /* Player movement code */
     {
@@ -530,7 +537,7 @@ the arena */
     /* @Test -  particles update after collision */
     {
       state->ball.ball_data.particle_system.pos = state->ball.pos;
-      particle_system_update(&state->ball.ball_data.particle_system);
+      particle_system_update(&state->ball.ball_data.particle_system, input->dt);
     }
     
     /* Re-imagining player score / score progress - Using the arena middle line as a 'load bar' to next levels */
@@ -575,9 +582,7 @@ the arena */
       
       /* Ball particle hit */
       {
-        if (state->ball.ball_data.particle_system.is_ready_for_emission) {
-          renderer_debug_particles(back_buffer, &state->ball.ball_data.particle_system);
-        }
+        renderer_debug_particles(back_buffer, &state->ball.ball_data.particle_system);
       }
       
       /* 'Not so ugly' Ball trail (rect) representation - @IDEIA: change color if it's FAST */
@@ -598,7 +603,6 @@ the arena */
       }
       
       /* Ball (rect) representation - @IDEIA: change color if it's FAST */
-      //draw_filled_rect(back_buffer, state->ball.pos.x, state->ball.pos.y, state->ball.width, state->ball.height, state->ball.color);
       renderer_debug_entity(back_buffer, &state->ball);
       
       /* Player (rect) representation - @IDEIA: change color when moving */

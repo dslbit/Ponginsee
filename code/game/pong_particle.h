@@ -39,7 +39,6 @@ INTERNAL ParticleSystem particle_system_create(GameMemory *mem, B32 is_ready_for
   for (i = 0; i < particles_count; ++i) {
     /* ps.particles[i].vel = ; */ /* TODO: Random number generator */
     ps.particles[i].pos = ps.pos;
-    ps.particles[i].life = 1.0f;
     ps.particles[i].width = particles_width;
     ps.particles[i].height = particles_height;
     ps.particles[i].color = particles_color;
@@ -48,14 +47,35 @@ INTERNAL ParticleSystem particle_system_create(GameMemory *mem, B32 is_ready_for
   return ps;
 }
 
-INTERNAL void particle_system_update(ParticleSystem *ps) {
+INTERNAL void particle_system_update(ParticleSystem *ps, F32 dt) {
   S32 i;
   Particle *p;
   
-  /* TODO: make use of particle's life & pos integration */
+#if 0
+  state->ball.ball_data.particle_system.is_ready_for_emission = FALSE; /* only true when collision happens with player, opponent and arena */
+#endif
+  
+  if (ps->is_initialized && ps->is_ready_for_emission) {
+    /* TODO: make use of particle's life & pos integration */
+    for (i = 0; i < ps->particles_count; ++i) {
+      p = &ps->particles[i];
+      p->acc.x = -1110; /* TODO: random */
+      p->acc.y = 1115; /* TODO: random */
+      p->pos = ps->pos;
+      p->life = 0.75f; /* TODO: random */
+    }
+    ps->is_ready_for_emission = FALSE;
+  }
+  
   for (i = 0; i < ps->particles_count; ++i) {
     p = &ps->particles[i];
-    p->pos = ps->pos;
+    
+    p->vel = v2_add(p->vel, v2_mul(p->acc, dt));
+    p->vel = v2_add(p->vel, v2_mul(p->vel, -0.01f));
+    p->pos = v2_add(p->pos, v2_mul(p->vel, dt));
+    v2_zero(&p->acc);
+    p->life -= dt;
+    p->color.a = p->life;
   }
 }
 
