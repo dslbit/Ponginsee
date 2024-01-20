@@ -59,10 +59,12 @@ INTERNAL void particle_system_update(ParticleSystem *ps, F32 dt) {
     /* TODO: make use of particle's life & pos integration */
     for (i = 0; i < ps->particles_count; ++i) {
       p = &ps->particles[i];
-      p->acc.x = -1110; /* TODO: random */
-      p->acc.y = 1115; /* TODO: random */
-      p->pos = ps->pos;
-      p->life = 0.75f; /* TODO: random */
+      if (p->life <= 0) {
+        p->acc.x = random_f32_range(-1110, 1110);
+        p->acc.y = random_f32_range(-1110, 1110);
+        p->pos = ps->pos;
+        p->life = random_f32_range(0, 0.5f);
+      }
     }
     ps->is_ready_for_emission = FALSE;
   }

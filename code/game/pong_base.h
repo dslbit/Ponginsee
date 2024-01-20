@@ -109,12 +109,37 @@ typedef float    F32;
 typedef double   F64;
 #endif /* #if (__STDC_VERSION__ < 199901L) */
 
+#define UINT32_MAX (0xffffffff)
+
 INTERNAL INLINE void debug_zero_array(void *array, U64 size) { /* size in bytes */
   U64 i;
   
   for (i = 0; i < size; ++i) {
     *(CAST(U8 *)array + i) = 0;
   }
+}
+
+extern U32 global_random_seed = 1;
+
+/* NOTE: Generates a random number between 0.0 and 1.0 */
+INTERNAL INLINE F32 random_f32() {
+  F32 result;
+  U32 x;
+  
+  x = global_random_seed;
+  x ^= x << 13;
+	x ^= x >> 17;
+	x ^= x << 5;
+  global_random_seed = x;
+  result = CAST(F32) (CAST(F64) x / CAST(F64) UINT32_MAX);
+  return result;
+}
+
+INTERNAL INLINE F32 random_f32_range(F32 min, F32 max) {
+  F32 result;
+  
+  result = (max - min) * random_f32() + min;
+  return result;
 }
 
 #endif /* PONG_BASE_H */

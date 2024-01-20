@@ -1,6 +1,7 @@
 /*
 -* TODO LIST:
--*  |_-> Simple particle system
+-*
+-*  |_-> Increse ball size when the collision occour
 -*
 -*  |_-> Pull out the entity vs arena code? Maybe return a v2 -1 to 1 range to
 -*  identify where entity was before going out of bounds
@@ -14,6 +15,8 @@
 -*  |_-> Save progress? - IDK how crazy this will get, so do it only if it's
 -*  needed
 -*
+-*
+-*  |_-> Rotated rects
 -*  |_-> Figure out text rendering (Bitmap & TrueType)
 -*   |_-> Show debug info in-game
 -*  |_-> Debug simplified console
@@ -291,7 +294,7 @@ INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameM
       trail->pos = state->ball.pos;
       trail->life = 0.0f;
     }
-    state->ball.ball_data.particle_system = particle_system_create(memory, FALSE, state->ball.pos, FALSE, 0, 16, 4, 4, color_create_from_hex(0xbcb0b340));
+    state->ball.ball_data.particle_system = particle_system_create(memory, FALSE, state->ball.pos, FALSE, 0, 128, 2, 2, state->ball.color);
   }
   
   /* Classic level: update and render */

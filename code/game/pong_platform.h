@@ -61,6 +61,7 @@ struct GameState {
   B32 is_initialized;
   B32 is_paused;
   B32 is_showing_paused_screen;
+  U32 random_seed;
   GameMemory game_memory;
   GameLevel game_level;
   F32 score_rect_x;

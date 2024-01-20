@@ -644,6 +644,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
           ASSERT(QueryPerformanceCounter(&current_perf_counter) != 0, L"Couldn't get processor \'performance counter\' - \'QueryPerformanceCounter(...)\' shouldn't return 0!"); /* @IMPORTANT: Maybe do something smart here if it fails for some reason */
           
           perf_counter_diff.QuadPart = current_perf_counter.QuadPart - last_perf_counter.QuadPart; /* counts elapsed */
+          //game_state->random_seed = CAST(U32) perf_counter_diff.QuadPart;
+          global_random_seed = CAST(U32) perf_counter_diff.QuadPart;
           elapsed_secs = CAST(float) perf_counter_diff.QuadPart / CAST(float) perf_frequency.QuadPart; /* counts per second */
           elapsed_ms          = elapsed_secs * 1000.0f;
           elapsed_microsecs   = elapsed_secs * 1000000.0f;
