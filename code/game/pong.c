@@ -1,8 +1,6 @@
 /*
 -* TODO LIST:
 -*
--*  |_-> Increse ball size when the collision occour
--*
 -*  |_-> Pull out the entity vs arena code? Maybe return a v2 -1 to 1 range to
 -*  identify where entity was before going out of bounds
 -*
@@ -82,9 +80,9 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
     
     state->ball = entity_create(ENTITY_TYPE_BLANK);
     state->ball.color = color_create_from_hex(0x3ec54b60);
-    state->ball.vel = v2_create(-250.0f, -110.0f);
     state->ball.width = 7;
     state->ball.height = 7;
+    state->ball.ball_data.size_multiplier = 1;
   }
   
   /* NOTE: Primitve level selection & pause action */
@@ -286,7 +284,19 @@ INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameM
     
     state->ball.pos.x = level_bounding_rect_width / 2.0f;
     state->ball.pos.y = level_bounding_rect_height / 2.0f;
-    state->ball.vel = v2_create(-250.0f, -110.0f);
+    {
+      F32 vel_x, vel_y;
+      S32 sign;
+      
+      vel_x = random_f32_range(-250.0f, 250.0f);
+      sign = SIGN_OF(vel_x);
+      vel_x = (ABS(vel_x) < 100) ? (vel_x + (100 * sign)) : (vel_x);
+      vel_y = random_f32_range(-110.0f, 110.0f);
+      sign = SIGN_OF(vel_y);
+      vel_y = (ABS(vel_y) < 50) ? (vel_y + (50 * sign)) : (vel_y);
+      state->ball.vel = v2_create(vel_x, vel_y); /* TODO: Check angle between ball and player/opponent, it cannot be too close to 90deg */
+    }
+    
     for (i = 0; i < ARRAY_COUNT(state->ball.ball_data.trails); ++i) {
       Trail *trail;
       
@@ -377,6 +387,7 @@ INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameM
       }
       
       ball->pos = v2_add(ball->pos, v2_mul(ball->vel, input->dt));
+      /* NOTE: Update ball trails position */
       {
         U64 trails_count;
         Trail *trail;
@@ -385,13 +396,13 @@ INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameM
         trails_count = ARRAY_COUNT(ball->ball_data.trails);
         ball->ball_data.timer_trail_spawner -= input->dt;
         if (ball->ball_data.timer_trail_spawner < 0) {
-          ball->ball_data.timer_trail_spawner = 0.00016f;
+          ball->ball_data.timer_trail_spawner = 0.000016f;
           if (ball->ball_data.trails_next >= trails_count) {
             ball->ball_data.trails_next = 0;
           }
           trail = &ball->ball_data.trails[ball->ball_data.trails_next];
           trail->pos = ball->pos;
-          trail->life = 0.45f * 10.0f;
+          trail->life = 0.25f * 10.0f;
           ball->ball_data.trails_next++;
         }
         for (i = 0; i < trails_count; ++i) {
@@ -400,6 +411,10 @@ INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameM
           if (trail->life < 0) trail->life = 0;
         }
       }
+      
+      /* Update ball size multiplier */
+      ball->ball_data.size_multiplier -= input->dt * 2;
+      ball->ball_data.size_multiplier = CLAMP(ball->ball_data.size_multiplier, 1.0f, 10.0f);
     }
     
     /* Axis-aligned Collision - @IMPORTANT: make sure it's above the 'clear_background' */
@@ -451,6 +466,7 @@ INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameM
           ball->pos.y = ball->height/2.0f;
           ball->vel.y *= -1;
           ball->ball_data.particle_system.is_ready_for_emission = TRUE;
+          state->ball.ball_data.size_multiplier = BALL_DEFAULT_SIZE_MULTIPLYER;
         }
         
         ball_hit_point_bottom = CAST(S32) (ball->pos.y + ball->height/2.0f);
@@ -458,6 +474,7 @@ INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameM
           ball->pos.y = level_bounding_rect_height - ball->height/2.0f;
           ball->vel.y *= -1;
           ball->ball_data.particle_system.is_ready_for_emission = TRUE;
+          state->ball.ball_data.size_multiplier = BALL_DEFAULT_SIZE_MULTIPLYER;
         }
         
         ball_hit_point_left = CAST(S32) (ball->pos.x - ball->width/2.0f);
@@ -505,6 +522,7 @@ the arena */
           ball->vel = v2_add(ball->vel, v2_mul(ball->vel, ABS(player->vel.y) * 0.0009f));
           ball->vel.x *= -1;
           ball->ball_data.particle_system.is_ready_for_emission = TRUE;
+          state->ball.ball_data.size_multiplier = BALL_DEFAULT_SIZE_MULTIPLYER;
         }
       }
       
@@ -533,6 +551,7 @@ the arena */
           ball->vel = v2_add(ball->vel, v2_mul(ball->vel, ABS(opponent->vel.y) * 0.0009f));
           ball->vel.x *= -1;
           ball->ball_data.particle_system.is_ready_for_emission = TRUE;
+          state->ball.ball_data.size_multiplier = BALL_DEFAULT_SIZE_MULTIPLYER;
         }
       }
     }
@@ -606,7 +625,13 @@ the arena */
       }
       
       /* Ball (rect) representation - @IDEIA: change color if it's FAST */
-      renderer_debug_entity(back_buffer, &state->ball);
+      /* renderer_debug_entity(back_buffer, &state->ball); */
+      {
+        Entity *b;
+        
+        b = &state->ball;
+        renderer_filled_rect(back_buffer, b->pos.x, b->pos.y, b->width * b->ball_data.size_multiplier, b->height * b->ball_data.size_multiplier, b->color);
+      }
       
       /* Player (rect) representation - @IDEIA: change color when moving */
       renderer_debug_entity(back_buffer, &state->player);

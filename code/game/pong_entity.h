@@ -22,10 +22,12 @@ struct Trail {
   F32 life;
 };
 
+#define BALL_DEFAULT_SIZE_MULTIPLYER (1.65f)
 typedef struct EntityBall EntityBall;
 struct EntityBall {
+  F32 size_multiplier;
   F32 timer_trail_spawner;
-  Trail trails[32]; /* circular buffer - it uses the help of 'trails_next' variable */
+  Trail trails[64]; /* circular buffer - it uses the help of 'trails_next' variable */
   S32 trails_next; /* index to the next available trail V2 */
   ParticleSystem particle_system;
 };

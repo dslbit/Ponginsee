@@ -54,6 +54,8 @@
 
 #define CLAMP(_x, _min, _max) ( ((_x) < (_min)) ? (_min) : (((_x) > (_max)) ? (_max) : (_x)) )
 
+#define SIGN_OF(_x) (((_x) < 0) ? (-1) : (1))
+
 #if defined(__cplusplus)
 #define EXTERN_OPEN extern "C" {
 #else
@@ -121,7 +123,7 @@ INTERNAL INLINE void debug_zero_array(void *array, U64 size) { /* size in bytes 
 
 extern U32 global_random_seed = 1;
 
-/* NOTE: Generates a random number between 0.0 and 1.0 */
+/* NOTE: Generate a random number between 0.0 and 1.0 - Xorshift */
 INTERNAL INLINE F32 random_f32() {
   F32 result;
   U32 x;
@@ -135,6 +137,7 @@ INTERNAL INLINE F32 random_f32() {
   return result;
 }
 
+/* NOTE: Generate a random number in range - using Xorshift */
 INTERNAL INLINE F32 random_f32_range(F32 min, F32 max) {
   F32 result;
   
