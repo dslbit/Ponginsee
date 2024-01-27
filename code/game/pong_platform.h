@@ -25,7 +25,7 @@ struct GameButtonState {
 typedef struct GameControllerInput GameControllerInput;
 struct GameControllerInput {
   union {
-    GameButtonState buttons[16];
+    GameButtonState buttons[19];
     struct {
       GameButtonState start;
       GameButtonState back; /* also used for menu (escape key / select on controller) */
@@ -33,6 +33,10 @@ struct GameControllerInput {
       GameButtonState down;
       GameButtonState left;
       GameButtonState right;
+      
+      GameButtonState f3;
+      GameButtonState plus;
+      GameButtonState minus;
       
       GameButtonState aux0;
       GameButtonState aux1;
@@ -56,12 +60,19 @@ struct GameInput {
   GameControllerInput player1;
 };
 
+typedef struct GameDebugState GameDebugState;
+struct GameDebugState {
+  B32 is_on;
+  F32 dt;
+};
+
 typedef struct GameState GameState;
 struct GameState {
   B32 is_initialized;
   B32 is_paused;
   B32 is_showing_paused_screen;
   U32 random_seed;
+  GameDebugState game_debug_state;
   GameMemory game_memory;
   GameLevel game_level;
   F32 score_rect_x;

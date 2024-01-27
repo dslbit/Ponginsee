@@ -242,6 +242,18 @@ INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wp
       released = (was_down && !is_down) ? TRUE : FALSE;
       
       switch (key) {
+        case VK_F3: {
+          win32_change_key_state(&game_input->player1.f3, pressed, released);
+        } break;
+        
+        case VK_NEXT: {
+          win32_change_key_state(&game_input->player1.plus, pressed, released);
+        } break;
+        
+        case VK_PRIOR: {
+          win32_change_key_state(&game_input->player1.minus, pressed, released);
+        } break;
+        
         /* NOTE: This will also be used as the 'start' button for the game (VK_RETURN). */
         case VK_F11:
         case VK_RETURN:{

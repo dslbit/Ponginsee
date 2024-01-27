@@ -13,7 +13,8 @@
 -*  |_-> Save progress? - IDK how crazy this will get, so do it only if it's
 -*  needed
 -*
--*
+-*  |_-> On/Off features (particles, bounce effects, ddp effects, etc.)
+-*  |_-> Slow motion dt
 -*  |_-> Rotated rects
 -*  |_-> Figure out text rendering (Bitmap & TrueType)
 -*   |_-> Show debug info in-game
@@ -56,6 +57,8 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
   if (!state->is_initialized) {
     state->is_initialized = TRUE;
     
+    state->game_debug_state.is_on = FALSE;
+    state->game_debug_state.dt = 0.033333f;
     state->background_color = color_create_from_hex(0x1f1723ff);
     state->background_color_paused = color_create_from_hex(0xefd08180);
     /* NOTE: Maybe this should be moved to the level update function
@@ -83,6 +86,33 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
     state->ball.width = 7;
     state->ball.height = 7;
     state->ball.ball_data.size_multiplier = 1;
+  }
+  
+  /* NOTE: Engine debug mode */
+  {
+    GameDebugState *debug;
+    
+    debug = &state->game_debug_state;
+    /* debug mode toggle */
+    if (input->player1.f3.released) {
+      state->game_debug_state.is_on = !state->game_debug_state.is_on;
+    }
+    
+    /* dt change*/
+    if (input->player1.minus.released) {
+      debug->dt += 0.0023334f;
+    }
+    if (input->player1.plus.released) {
+      debug->dt -= 0.0023334f;
+      if (debug->dt < 0) {
+        debug->dt = 0;
+      }
+    }
+    
+    /* set debug state if it's on */
+    if (state->game_debug_state.is_on) {
+      input->dt = debug->dt;
+    }
   }
   
   /* NOTE: Primitve level selection & pause action */
@@ -170,6 +200,32 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
     default: {
       ASSERT(0, L"Invalid game level ID.");
     }
+  }
+  
+  /* NOTE: Engine debug mode drawing over */
+  {
+    GameDebugState *debug;
+    
+    debug = &state->game_debug_state;
+    if (debug->is_on) {
+      
+      /* debug rect indication */
+      {
+        F32 border_size;
+        
+        border_size = 3;
+        renderer_filled_rect(back_buffer, 0+border_size/2.0f, back_buffer->height/2.0f, border_size, CAST(F32) back_buffer->height, color_create_from_rgba(178, 39, 65, 160)); /* left border */
+        
+        renderer_filled_rect(back_buffer, back_buffer->width - border_size/2.0f, back_buffer->height/2.0f, border_size, CAST(F32) back_buffer->height, color_create_from_rgba(178, 39, 65, 160)); /* right border */
+        
+        renderer_filled_rect(back_buffer, back_buffer->width/2.0f, border_size/2.0f, CAST(F32) back_buffer->width - border_size*2, border_size, color_create_from_rgba(178, 39, 65, 160)); /* top border */
+        
+        renderer_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height-border_size/2.0f, CAST(F32) back_buffer->width - border_size*2, border_size, color_create_from_rgba(178, 39, 65, 160)); /* top border */
+      }
+      
+    }
+    
+    
   }
 }
 
