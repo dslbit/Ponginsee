@@ -10,11 +10,12 @@
 -*  |_-> Menu screen (Play, Scoreboard (stores personal records), Settings
 -*  (Resolution, Audio, Controls), Quit)
 -*  |_-> Pause menu (Main menu, Quit Game)
+-*   |_-> Only have pause state for now.
 -*  |_-> Save progress? - IDK how crazy this will get, so do it only if it's
 -*  needed
 -*
 -*  |_-> On/Off features (particles, bounce effects, ddp effects, etc.)
--*  |_-> Slow motion dt
+-*   |_> Also display that in the F3 (debug) state of the engine/game.
 -*  |_-> Rotated rects
 -*  |_-> Figure out text rendering (Bitmap & TrueType)
 -*   |_-> Show debug info in-game
@@ -264,49 +265,28 @@ INTERNAL void level_test(GameBackBuffer *back_buffer, GameInput *input, GameMemo
     state->game_level.is_running = TRUE;
     state->game_level.time_elapsed = 0.0f;
     
-    state->rect.pos.x = input->mouse_pos.x;
-    state->rect.pos.y = input->mouse_pos.y;
-    state->rect.width = 300;
-    state->rect.height = 21;
-    state->rect.color = color_create_from_hex(0xff000080);
-    
-    state->box.pos.x = (state->game_level.min_bounding_rect_x + state->game_level.max_bounding_rect_x) / 2.0f;
-    state->box.pos.y = (state->game_level.min_bounding_rect_y + state->game_level.max_bounding_rect_y) / 2.0f;
-    state->box.width = 120;
-    state->box.height = 120;
-    state->box.color = color_create_from_hex(0xffffffff);
+    state->recty_x = back_buffer->width / 2.0f;
+    state->recty_y = back_buffer->height / 2.0f;
+    state->recty_width = 100.0f;
+    state->recty_height = 75.0f;
+    state->recty_rotation = 0.0f;
   }
   
   /* Test level: update */
   {
-    state->rect.pos.x = input->mouse_pos.x;
-    state->rect.pos.y = input->mouse_pos.y;
-    
-    /* AABB vs AABB - box vs rect */
-    {
-      B32 is_colliding;
-      
-      is_colliding = collision_aabb_vs_aabb(state->rect.pos, state->rect.width, state->rect.height, state->box.pos, state->box.width, state->box.height);
-      
-      if (is_colliding) {
-        /*state->rect.color = color_create_from_hex(0x72deebff);*/
-      } else {
-        /*state->rect.color = color_create_from_hex(0x4995f3ff);*/
-      }
-    }
-    
+    state->game_debug_state.accumulated_dt += input->dt;
   }
   
   /* Test level: render */
   {
-    /* TODO: Better background clear */
     renderer_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, state->background_color);
     
-    /* Box in the middle of the screen */
-    renderer_filled_rect(back_buffer, state->box.pos.x, state->box.pos.y, state->box.width, state->box.height, state->box.color);
-    
-    /* Rect at mouse position */
-    renderer_filled_rect(back_buffer, state->rect.pos.x, state->rect.pos.y, state->rect.width, state->rect.height, state->rect.color);
+    renderer_filled_rotated_rect(back_buffer, state->recty_x, state->recty_y, state->recty_width, state->recty_height, state->recty_rotation, color_create_from_rgba(0, 255, 0, 127));
+#if 1
+    if (state->game_debug_state.accumulated_dt > 1.0f) {
+      state->recty_rotation += input->dt*20.0f;
+    }
+#endif
   }
 }
 

@@ -41,6 +41,8 @@
 #define LOCAL static
 #define GLOBAL static
 
+#define PI 3.1415926535f
+
 #define STRINGIFY_HELPER(_s) #_s
 #define STRINGIFY(_x) STRINGIFY_HELPER(_x)
 

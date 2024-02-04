@@ -5,11 +5,23 @@
 
 EXTERN_OPEN /* extern "C" { */
 
-/* NOTE: Round towards zero - Not good for negative values */
+INTERNAL INLINE S32 truncate_f32(F32 value) {
+  S32 result;
+  
+  result = CAST(S32) value;
+  return result;
+}
+
+/* NOTE: Not fully tested */
 INTERNAL INLINE F32 round_f32(F32 value) {
   F32 result;
   
-  result = CAST(F32) (CAST(S32) (value + 0.5f));
+  if (value > 0) {
+    result = CAST(F32) floor((value + 0.5f));
+  } else {
+    result = CAST(F32) floor((value + -0.5f));
+  }
+  
   return result;
 }
 
@@ -89,10 +101,76 @@ INTERNAL INLINE F32 v2_dot(V2 a, V2 b) {
   return result;
 }
 
+INTERNAL INLINE F32 v2_mag(V2 a) {
+  F32 result;
+  
+  result = sqrtf(SQUARE(a.x) + SQUARE(a.y));
+  return result;
+}
+
 INTERNAL INLINE F32 v2_mag_squared(V2 a) {
   F32 result;
   
   result = v2_dot(a, a);
+  return result;
+}
+
+INTERNAL INLINE V2 v2_norm(V2 a) {
+  F32 mag;
+  V2 result = {0};
+  
+  mag = v2_mag(a);
+  if (mag != 0) {
+    result.x = a.x / mag;
+    result.y = a.y / mag;
+  }
+  return result;
+}
+
+typedef struct M2 M2;
+struct M2 {
+  union {
+    F32 e[2][2];
+    struct {
+      F32 _00;
+      F32 _01;
+      F32 _10;
+      F32 _11;
+    };
+  };
+};
+
+INTERNAL INLINE M2 m2_create(F32 _00, F32 _01, F32 _10, F32 _11) {
+  M2 result;
+  
+  result._00 = _00;
+  result._01 = _01;
+  result._10 = _10;
+  result._11 = _11;
+  return result;
+}
+
+INTERNAL INLINE V2 m2_mul_v2(M2 m, V2 v) {
+  V2 result;
+  
+  result = v2_create( ((v.x * m._00) + (v.y * m._01)), ((v.x * m._10) + (v.y * m._11)) );
+  return result;
+}
+
+
+
+typedef struct Rect2 Rect2;
+struct Rect2 {
+  V2 p[4];
+};
+
+INTERNAL INLINE Rect2 rect2_create(V2 min, V2 max) {
+  Rect2 result;
+  
+  result.p[0] = min;
+  result.p[1] = v2_create(max.x, min.y);
+  result.p[2] = max;
+  result.p[3] = v2_create(min.x, max.y);
   return result;
 }
 

@@ -80,6 +80,105 @@ INTERNAL void renderer_filled_rect(GameBackBuffer *back_buffer, F32 x, F32 y, F3
   }
 }
 
+INTERNAL void renderer_filled_rotated_rect(GameBackBuffer *back_buffer, F32 x, F32 y, F32 width, F32 height, F32 angle, GameColor color) {
+  /* start drawing - (normal) filled rect */
+  if (angle == 0.0f || angle == 360.0f) {
+    renderer_filled_rect(back_buffer, x, y, width, height, color);
+  } else { // rotated rect
+    F32 radians;
+    F32 sin, cos;
+    V2 x_axis, y_axis;
+    M2 rotation_matrix;
+    Rect2 rect;
+    S32 k;
+    V2 rect_screen_center;
+    S32 min_bound_x, min_bound_y;
+    S32 max_bound_x, max_bound_y;
+    
+    radians = angle * (PI / 180.0f);
+    sin = sinf(radians);
+    cos = cosf(radians);
+    x_axis = v2_create(cos, sin);
+    y_axis = v2_create(-sin, cos);
+    rotation_matrix = m2_create(x_axis.x, y_axis.x, x_axis.y, y_axis.y);
+    
+    /* rect vertex */
+    {
+      V2 rect_min = v2_create(0.0f, 0.0f);
+      V2 rect_max = v2_create(width, height);
+      rect = rect2_create(rect_min, rect_max);
+    }
+    
+    rect_screen_center = v2_create(back_buffer->width / 2.0f - width/2.0f, back_buffer->height / 2.0f - height/2.0f);
+    min_bound_x = max_bound_x = min_bound_y = max_bound_y = 0;
+    for (k = 0; k < 4; ++k) {
+      rect.p[k] = m2_mul_v2(rotation_matrix, rect.p[k]); /* rect vertex rotation */
+      rect.p[k] = v2_add(rect.p[k], rect_screen_center); /* add offset to rotated vertex */
+      
+      S32 value_x, value_y;
+      value_x = truncate_f32(rect.p[k].x);
+      value_y = truncate_f32(rect.p[k].y);
+      if (value_x < min_bound_x) min_bound_x = value_x;
+      if (value_x > max_bound_x) max_bound_x = value_x;
+      if (value_y < min_bound_y) min_bound_y = value_y;
+      if (value_y > max_bound_y) max_bound_y = value_y;
+    }
+    
+    /* fill rotated rect */
+    {
+      S32 i, j;
+      V2 axis_1, axis_2;
+      F32 axis_1_mag, axis_2_mag;
+      F32 rel_pixel_px, rel_pixel_py;
+      F32 projection_1, projection_2;
+      U32 *row;
+      U32 *pixel;
+      S32 stride;
+      
+      min_bound_x = CLAMP(min_bound_x, 0, back_buffer->width);
+      max_bound_x = CLAMP(max_bound_x, 0, back_buffer->width);
+      min_bound_y = CLAMP(min_bound_y, 0, back_buffer->height);
+      max_bound_y = CLAMP(max_bound_y, 0, back_buffer->height);
+      
+      axis_1 = v2_sub(rect.p[1], rect.p[0]);
+      axis_1_mag = v2_mag(axis_1);
+      axis_1 = v2_norm(axis_1);
+      
+      axis_2 = v2_sub(rect.p[3], rect.p[0]);
+      axis_2_mag = v2_mag(axis_2);
+      axis_2 = v2_norm(axis_2);
+      
+      stride = back_buffer->width;
+      row = CAST(U32 *) back_buffer->memory + (min_bound_y * stride) + min_bound_x;
+      pixel = row;
+      for (i = min_bound_y; i < max_bound_y; ++i) {
+        for (j = min_bound_x; j < max_bound_x; ++j) {
+          rel_pixel_px = CAST(F32) j - rect.p[0].x;
+          rel_pixel_py = CAST(F32) i - rect.p[0].y;
+          projection_1 = (rel_pixel_px * axis_1.x) + (rel_pixel_py * axis_1.y);
+          projection_2 = (rel_pixel_px * axis_2.x) + (rel_pixel_py * axis_2.y);
+          if ( (projection_1 >= 0 && projection_1 <= axis_1_mag) && (projection_2 >= 0 && projection_2 <= axis_2_mag) ) {
+            *pixel = 0xffffffff;
+          }
+          ++pixel;
+        }
+        row += stride;
+        pixel = row;
+      }
+    }
+    
+    /* debug rect vertex drawing */
+    {
+      GameColor vertex_color = color_create_from_rgba(127, 12, 12, 255);
+      renderer_filled_rect(back_buffer, rect.p[0].x, rect.p[0].y, 5, 5, vertex_color);
+      renderer_filled_rect(back_buffer, rect.p[1].x, rect.p[1].y, 5, 5, vertex_color);
+      renderer_filled_rect(back_buffer, rect.p[2].x, rect.p[2].y, 5, 5, vertex_color);
+      renderer_filled_rect(back_buffer, rect.p[3].x, rect.p[3].y, 5, 5, vertex_color);
+    }
+    
+  }
+}
+
 INTERNAL INLINE void renderer_debug_entity(GameBackBuffer *back_buffer, Entity *entity) {
   renderer_filled_rect(back_buffer, entity->pos.x, entity->pos.y, entity->width, entity->height, entity->color);
 }

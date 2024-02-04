@@ -64,6 +64,7 @@ typedef struct GameDebugState GameDebugState;
 struct GameDebugState {
   B32 is_on;
   F32 dt;
+  F32 accumulated_dt;
 };
 
 typedef struct GameState GameState;
@@ -81,8 +82,7 @@ struct GameState {
   F32 score_rect_height;
   
   /* NOTE: TEMPORARY - Test level data */
-  Entity box;
-  Entity rect;
+  F32 recty_x, recty_y, recty_width, recty_height, recty_rotation;
   
   GameColor background_color;
   GameColor background_color_paused;
