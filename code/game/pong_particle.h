@@ -8,6 +8,7 @@ struct Particle {
   V2 acc;
   V2 vel;
   V2 pos;
+  F32 angle;
   F32 life;
   F32 width;
   F32 height;
@@ -75,6 +76,7 @@ INTERNAL void particle_system_update(ParticleSystem *ps, F32 dt) {
     p->vel = v2_add(p->vel, v2_mul(p->acc, dt));
     p->vel = v2_add(p->vel, v2_mul(p->vel, -0.01f));
     p->pos = v2_add(p->pos, v2_mul(p->vel, dt));
+    p->angle = v2_angle(p->vel);
     v2_zero(&p->acc);
     p->life -= dt;
     p->color.a = p->life;

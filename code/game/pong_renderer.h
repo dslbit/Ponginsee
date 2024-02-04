@@ -209,7 +209,7 @@ INTERNAL INLINE void renderer_debug_particles(GameBackBuffer *back_buffer, Parti
   for (i = 0; i < ps->particles_count; ++i) {
     p = &ps->particles[i];
     if (p->life > 0) {
-      renderer_filled_rect(back_buffer, p->pos.x, p->pos.y, p->width, p->height, p->color);
+      renderer_filled_rotated_rect(back_buffer, p->pos.x, p->pos.y, p->width, p->height, rad_to_deg(p->angle), p->color);
     }
   }
 }

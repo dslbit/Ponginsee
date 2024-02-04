@@ -340,7 +340,7 @@ INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameM
       trail->pos = state->ball.pos;
       trail->life = 0.0f;
     }
-    state->ball.ball_data.particle_system = particle_system_create(memory, FALSE, state->ball.pos, FALSE, 0, 128, 2, 2, state->ball.color);
+    state->ball.ball_data.particle_system = particle_system_create(memory, FALSE, state->ball.pos, FALSE, 0, 32, 2, 2, state->ball.color);
   }
   
   /* Classic level: update and render */
