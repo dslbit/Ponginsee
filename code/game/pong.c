@@ -281,7 +281,7 @@ INTERNAL void level_test(GameBackBuffer *back_buffer, GameInput *input, GameMemo
   {
     renderer_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, state->background_color);
     
-    renderer_filled_rotated_rect(back_buffer, state->recty_x, state->recty_y, state->recty_width, state->recty_height, state->recty_rotation, color_create_from_rgba(0, 255, 0, 127));
+    renderer_filled_rotated_rect(back_buffer, state->recty_x, state->recty_y, state->recty_width, state->recty_height, state->recty_rotation, color_create_from_rgba(127, 127, 127, 127));
 #if 1
     if (state->game_debug_state.accumulated_dt > 1.0f) {
       state->recty_rotation += input->dt*20.0f;

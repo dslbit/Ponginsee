@@ -91,7 +91,7 @@ INTERNAL void renderer_filled_rotated_rect(GameBackBuffer *back_buffer, F32 x, F
     M2 rotation_matrix;
     Rect2 rect;
     S32 k;
-    V2 rect_screen_center;
+    V2 rect_pos;
     S32 min_bound_x, min_bound_y;
     S32 max_bound_x, max_bound_y;
     
@@ -104,24 +104,28 @@ INTERNAL void renderer_filled_rotated_rect(GameBackBuffer *back_buffer, F32 x, F
     
     /* rect vertex */
     {
-      V2 rect_min = v2_create(0.0f, 0.0f);
-      V2 rect_max = v2_create(width, height);
+      /* anchor: rect center */
+      V2 rect_min = v2_create(-width/2.0f, -height/2.0f);
+      V2 rect_max = v2_create(width/2.0f, height/2.0f);
       rect = rect2_create(rect_min, rect_max);
     }
     
-    rect_screen_center = v2_create(back_buffer->width / 2.0f - width/2.0f, back_buffer->height / 2.0f - height/2.0f);
+    rect_pos = v2_create(x, y);
     min_bound_x = max_bound_x = min_bound_y = max_bound_y = 0;
     for (k = 0; k < 4; ++k) {
       rect.p[k] = m2_mul_v2(rotation_matrix, rect.p[k]); /* rect vertex rotation */
-      rect.p[k] = v2_add(rect.p[k], rect_screen_center); /* add offset to rotated vertex */
+      rect.p[k] = v2_add(rect.p[k], rect_pos); /* add offset to rotated vertex */
       
-      S32 value_x, value_y;
-      value_x = truncate_f32(rect.p[k].x);
-      value_y = truncate_f32(rect.p[k].y);
-      if (value_x < min_bound_x) min_bound_x = value_x;
-      if (value_x > max_bound_x) max_bound_x = value_x;
-      if (value_y < min_bound_y) min_bound_y = value_y;
-      if (value_y > max_bound_y) max_bound_y = value_y;
+      /* finding min & max bounding values */
+      {
+        S32 value_x, value_y;
+        value_x = truncate_f32(rect.p[k].x);
+        value_y = truncate_f32(rect.p[k].y);
+        if (value_x < min_bound_x) min_bound_x = value_x;
+        if (value_x > max_bound_x) max_bound_x = value_x;
+        if (value_y < min_bound_y) min_bound_y = value_y;
+        if (value_y > max_bound_y) max_bound_y = value_y;
+      }
     }
     
     /* fill rotated rect */
@@ -158,7 +162,20 @@ INTERNAL void renderer_filled_rotated_rect(GameBackBuffer *back_buffer, F32 x, F
           projection_1 = (rel_pixel_px * axis_1.x) + (rel_pixel_py * axis_1.y);
           projection_2 = (rel_pixel_px * axis_2.x) + (rel_pixel_py * axis_2.y);
           if ( (projection_1 >= 0 && projection_1 <= axis_1_mag) && (projection_2 >= 0 && projection_2 <= axis_2_mag) ) {
-            *pixel = 0xffffffff;
+            F32 dest_r, dest_g, dest_b;
+            F32 r, g, b;
+            U32 color_u32;
+            
+            dest_r = ((*pixel) >> 16 & 0xFF) / 255.0f;
+            dest_g = ((*pixel) >> 8 & 0xFF) / 255.0f;
+            dest_b = ((*pixel) >> 0 & 0xFF) / 255.0f;
+            
+            r = (1.0f - color.a)*dest_r + color.a*color.r;
+            g = (1.0f - color.a)*dest_g + color.a*color.g;
+            b = (1.0f - color.a)*dest_b + color.a*color.b;
+            
+            color_u32 = (0xff << 24) | (round_f32_to_u32(r * 255.0f) << 16) | (round_f32_to_u32(g * 255.0f) << 8) | (round_f32_to_u32(b * 255.0f) << 0);
+            *pixel = color_u32;
           }
           ++pixel;
         }
@@ -168,6 +185,7 @@ INTERNAL void renderer_filled_rotated_rect(GameBackBuffer *back_buffer, F32 x, F
     }
     
     /* debug rect vertex drawing */
+#if 0
     {
       GameColor vertex_color = color_create_from_rgba(127, 12, 12, 255);
       renderer_filled_rect(back_buffer, rect.p[0].x, rect.p[0].y, 5, 5, vertex_color);
@@ -175,6 +193,7 @@ INTERNAL void renderer_filled_rotated_rect(GameBackBuffer *back_buffer, F32 x, F
       renderer_filled_rect(back_buffer, rect.p[2].x, rect.p[2].y, 5, 5, vertex_color);
       renderer_filled_rect(back_buffer, rect.p[3].x, rect.p[3].y, 5, 5, vertex_color);
     }
+#endif
     
   }
 }
