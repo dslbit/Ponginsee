@@ -95,7 +95,7 @@ INTERNAL void renderer_filled_rotated_rect(GameBackBuffer *back_buffer, F32 x, F
     S32 min_bound_x, min_bound_y;
     S32 max_bound_x, max_bound_y;
     
-    radians = angle * (PI / 180.0f);
+    radians = deg_to_rad(angle);
     sin = sinf(radians);
     cos = cosf(radians);
     x_axis = v2_create(cos, sin);

@@ -19,6 +19,7 @@ struct EntityPlayer {
 typedef struct Trail Trail;
 struct Trail {
   V2 pos;
+  F32 angle;
   F32 life;
 };
 

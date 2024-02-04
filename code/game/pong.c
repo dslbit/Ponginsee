@@ -438,6 +438,7 @@ INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameM
           }
           trail = &ball->ball_data.trails[ball->ball_data.trails_next];
           trail->pos = ball->pos;
+          trail->angle = v2_angle(ball->vel);
           trail->life = 0.25f * 10.0f;
           ball->ball_data.trails_next++;
         }
@@ -654,7 +655,7 @@ the arena */
           if (trail->life > 0) {
             color_trail = state->ball.color;
             color_trail.a = (trail->life / 20.0f);
-            renderer_filled_rect(back_buffer, trail->pos.x, trail->pos.y, state->ball.width, state->ball.height, color_trail);
+            renderer_filled_rotated_rect(back_buffer, trail->pos.x, trail->pos.y, state->ball.width, state->ball.height, rad_to_deg(trail->angle), color_trail);
           }
         }
         

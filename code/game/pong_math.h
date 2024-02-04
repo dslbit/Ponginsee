@@ -41,6 +41,22 @@ INTERNAL INLINE U32 round_f32_to_u32(F32 value) {
   return result;
 }
 
+INTERNAL INLINE F32 deg_to_rad(F32 deg) {
+  F32 result;
+  
+  result = deg * (PI / 180.0f);
+  return result;
+}
+
+INTERNAL INLINE F32 rad_to_deg(F32 rad) {
+  F32 result;
+  
+  result = rad * (180.0f / PI);
+  return result;
+}
+
+
+
 typedef struct V2 V2;
 struct V2 {
   F32 x;
@@ -126,6 +142,15 @@ INTERNAL INLINE V2 v2_norm(V2 a) {
   }
   return result;
 }
+
+INTERNAL INLINE F32 v2_angle(V2 a) {
+  F32 result;
+  
+  result = atan2f(a.y, a.x);
+  return result;
+}
+
+
 
 typedef struct M2 M2;
 struct M2 {
