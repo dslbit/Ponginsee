@@ -82,7 +82,7 @@ INTERNAL void renderer_filled_rect(GameBackBuffer *back_buffer, F32 x, F32 y, F3
 
 INTERNAL void renderer_filled_rotated_rect(GameBackBuffer *back_buffer, F32 x, F32 y, F32 width, F32 height, F32 angle, GameColor color) {
   /* start drawing - (normal) filled rect */
-  if (angle == 0.0f || angle == 360.0f) {
+  if (angle == 0.0f || angle == 360.0f) { /* % 360 == 0? */
     renderer_filled_rect(back_buffer, x, y, width, height, color);
   } else { // rotated rect
     F32 radians;

@@ -86,7 +86,7 @@ struct GameState {
   
   GameColor background_color;
   GameColor background_color_paused;
-  /* @IMPORTANT: In a more generalized view, 'game_level' should store the
+  /* @IMPORTANT: In a more generalized view, 'game_level' should store the 
 entities - Right? */
   Entity player;
   Entity opponent;

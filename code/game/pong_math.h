@@ -5,6 +5,14 @@
 
 EXTERN_OPEN /* extern "C" { */
 
+INTERNAL INLINE U32 truncate_u64_to_u32(U64 value) {
+  U32 result;
+  
+  ASSERT(value <= UINT32_MAX, L"It's not safe to truncate this value!");
+  result = CAST(U32) value;
+  return result;
+}
+
 INTERNAL INLINE S32 truncate_f32(F32 value) {
   S32 result;
   

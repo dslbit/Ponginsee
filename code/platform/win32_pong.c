@@ -97,6 +97,32 @@ INTERNAL void win32_build_root_path_for_file(wchar_t *full_path, S32 full_path_l
   StringCbCatW(full_path, full_path_length, file_name);
 }
 
+INTERNAL void *win32_debug_read_entire_file(wchar_t *file_full_path) {
+  HANDLE file_handle;
+  LARGE_INTEGER file_size;
+  void *result;
+  
+  file_handle = CreateFileW(file_full_path, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+  if (file_handle == INVALID_HANDLE_VALUE) {
+    ASSERT(file_handle != INVALID_HANDLE_VALUE, L"Failed to open a file for reading.");
+    return 0;
+  }
+  ASSERT(GetFileSizeEx(file_handle, &file_size) != 0, L"Failed to get the file size.");
+  result = VirtualAlloc(0, file_size.QuadPart, (MEM_RESERVE | MEM_COMMIT), PAGE_READWRITE); /* NOTE: because this is a debug function, this isn't a great deal */
+  if (result != 0) {
+    DWORD bytes_read;
+    ASSERT(ReadFile(file_handle, result, truncate_u64_to_u32(file_size.QuadPart), &bytes_read, 0) != 0, L"");
+  }
+  CloseHandle(file_handle);
+  return result;
+}
+
+INTERNAL void win32_debug_free_entire_file(void *file_ptr) {
+  if (file_ptr) {
+    VirtualFree(file_ptr, 0, MEM_RELEASE);
+  }
+}
+
 INTERNAL Win32GameCode win32_load_game_code(wchar_t *dll_full_path, wchar_t *temp_dll_full_path, wchar_t *lock_pdb_full_path) {
   Win32GameCode game_code = {0};
   WIN32_FILE_ATTRIBUTE_DATA ignored = {0};
@@ -552,6 +578,19 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
       window_dc = GetDC(window);
       monitor_refresh_rate = GetDeviceCaps(window_dc, VREFRESH); /* NOTE: User's primary monitor */
       ASSERT((monitor_refresh_rate >= 30), L"Your primary monitor refresh rate is less than 30Hz, you wouldn't be able to experience the game well, so the application will be closed!");
+    }
+    
+    /* File I/O TEST */
+    {
+      void *file_memory;
+      S32 i;
+      wchar_t file_path[MAX_PATH];
+      
+      win32_build_root_path_for_file(file_path, ARRAY_COUNT(file_path), L"pong.dll");
+      file_memory = win32_debug_read_entire_file(file_path);
+      i = 0;
+      win32_debug_free_entire_file(file_memory);
+      i = 1;
     }
     
     win32_build_root_path_for_file(game_dll_full_path, ARRAY_COUNT(game_dll_full_path), L"pong.dll");

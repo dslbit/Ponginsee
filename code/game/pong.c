@@ -1,5 +1,6 @@
 /*
 -* TODO LIST:
+-*  |_-> Platform independent file I/O - to load textures/bitmaps
 -*
 -*  |_-> Pull out the entity vs arena code? Maybe return a v2 -1 to 1 range to
 -*  identify where entity was before going out of bounds
@@ -21,12 +22,10 @@
 -*   |_-> Show debug info in-game
 -*  |_-> Debug simplified console
 -*  |_-> Figure out the sound engine
--*  |_-> Platform-independent: sound output, file I/O
+-*  |_-> Platform-independent: sound output
 -*
 -* NOTE:
 -*  |_-> When I press the pause button when go fullscreen on/off, the 'back buffer' is not rendered.
--* 
--* 
 -* 
 */
 
