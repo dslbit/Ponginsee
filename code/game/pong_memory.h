@@ -17,6 +17,10 @@ struct GameMemory {
   U64 max_size; /* in bytes */
   U64 current_size; /* in bytes */
   void *address; /* base address */
+  
+  PlatformFreeEntireFileType *platform_free_entire_file;
+  PlatformReadEntireFileType *platform_read_entire_file;
+  PlatformWriteEntireFileType *platform_write_entire_file;
 };
 
 INTERNAL INLINE void *game_memory_push(GameMemory *mem, U64 push_size) {

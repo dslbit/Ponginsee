@@ -30,6 +30,7 @@
 */
 
 #include "pong_base.h"
+#include "pong_file_io.h"
 #include "pong_math.h"
 #include "pong_color.h"
 #include "pong_memory.h"
@@ -39,8 +40,6 @@
 #include "pong_level.h"
 #include "pong_platform.h"
 #include "pong_renderer.h"
-
-EXTERN_OPEN /* extern "C" { */
 
 /* NOTE: What if other levels have the same movement code? */
 INTERNAL void level_null(GameBackBuffer *back_buffer, GameInput *input, GameMemory *memory);
@@ -56,6 +55,14 @@ GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
   state = CAST(GameState *) memory->address;
   if (!state->is_initialized) {
     state->is_initialized = TRUE;
+    
+    /* Platform-independent file I/O test */
+    {
+      ReadFileResult file = {0};
+      
+      file = memory->platform_read_entire_file(L"pong.dll");
+      memory->platform_free_entire_file(file.data);
+    }
     
     state->game_debug_state.is_on = FALSE;
     state->game_debug_state.dt = 0.033333f;

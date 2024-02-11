@@ -51,7 +51,6 @@ struct Entity {
   };
 };
 
-
 INTERNAL INLINE Entity entity_create(EntityType type) {
   Entity result = {0};
   

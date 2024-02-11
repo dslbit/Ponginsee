@@ -97,47 +97,53 @@ INTERNAL void win32_build_root_path_for_file(wchar_t *full_path, S32 full_path_l
   StringCbCatW(full_path, full_path_length, file_name);
 }
 
-INTERNAL void *win32_debug_read_entire_file(wchar_t *file_full_path) {
+
+PLATFORM_FREE_ENTIRE_FILE_PROTOTYPE(win32_debug_free_entire_file) {
+  if (address) {
+    VirtualFree(address, 0, MEM_RELEASE);
+  }
+}
+
+PLATFORM_READ_ENTIRE_FILE_PROTOTYPE(win32_debug_read_entire_file) {
   HANDLE file_handle;
   LARGE_INTEGER file_size;
-  void *result;
+  ReadFileResult result = {0};
+  wchar_t file_full_path[MAX_PATH];
   
+  win32_build_root_path_for_file(file_full_path, ARRAY_COUNT(file_full_path), file_name);
   file_handle = CreateFileW(file_full_path, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
   if (file_handle == INVALID_HANDLE_VALUE) {
     ASSERT(file_handle != INVALID_HANDLE_VALUE, L"Failed to open a file for reading.");
-    return 0;
+    return result;
   }
   ASSERT(GetFileSizeEx(file_handle, &file_size) != 0, L"Failed to get the file size.");
-  result = VirtualAlloc(0, file_size.QuadPart, (MEM_RESERVE | MEM_COMMIT), PAGE_READWRITE); /* NOTE: because this is a debug function, this isn't a great deal */
-  if (result != 0) {
+  result.data_size = file_size.QuadPart;
+  result.data = VirtualAlloc(0, file_size.QuadPart, (MEM_RESERVE | MEM_COMMIT), PAGE_READWRITE); /* NOTE: because this is a debug function, this isn't a great deal */
+  if (result.data != 0) {
     DWORD bytes_read;
-    ASSERT(ReadFile(file_handle, result, truncate_u64_to_u32(file_size.QuadPart), &bytes_read, 0) != 0, L"");
+    ASSERT(ReadFile(file_handle, result.data, truncate_u64_to_u32(file_size.QuadPart), &bytes_read, 0) != 0, L"");
   }
   CloseHandle(file_handle);
   return result;
 }
 
-INTERNAL BOOL win32_debug_write_entire_file(wchar_t *file_full_path, DWORD data_size, void *file_data) {
+PLATFORM_WRITE_ENTIRE_FILE_PROTOTYPE(win32_debug_write_entire_file) {
   HANDLE file_handle;
   BOOL result;
   DWORD bytes_written;
+  wchar_t file_full_path[MAX_PATH];
   
+  win32_build_root_path_for_file(file_full_path, ARRAY_COUNT(file_full_path), file_name);
   file_handle = CreateFileW(file_full_path, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
   if (file_handle == INVALID_HANDLE_VALUE) {
     ASSERT(file_handle != INVALID_HANDLE_VALUE, L"Failed to open a file handle for writing data.");
     return 0;
   }
   bytes_written = 0;
-  result = WriteFile(file_handle, file_data, data_size, &bytes_written, 0);
+  result = WriteFile(file_handle, data, data_size, &bytes_written, 0);
   ASSERT(data_size == bytes_written, L"Failed to write to the file.");
   CloseHandle(file_handle);
   return result;
-}
-
-INTERNAL void win32_debug_free_entire_file(void *file_ptr) {
-  if (file_ptr) {
-    VirtualFree(file_ptr, 0, MEM_RELEASE);
-  }
 }
 
 INTERNAL Win32GameCode win32_load_game_code(wchar_t *dll_full_path, wchar_t *temp_dll_full_path, wchar_t *lock_pdb_full_path) {
@@ -493,7 +499,6 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
   window_class.style = (CS_VREDRAW | CS_HREDRAW);
   window_class.hInstance = instance;
   /* window_class.hbrBackground = CreateSolidBrush(RGB(255, 0, 255)); */
-  //window_class.hbrBackground = CreateSolidBrush(RGB(0, 0, 0));
   window_class.lpszClassName = L"Game Window Class";
   window_class.lpfnWndProc = win32_window_callback;
   /* Window class validation */
@@ -557,6 +562,9 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
     {
       game_memory.max_size = MEGABYTE(50);
       game_memory.address = VirtualAlloc(0, game_memory.max_size, (MEM_RESERVE | MEM_COMMIT), PAGE_READWRITE);
+      game_memory.platform_free_entire_file = win32_debug_free_entire_file;
+      game_memory.platform_read_entire_file = win32_debug_read_entire_file;
+      game_memory.platform_write_entire_file = win32_debug_write_entire_file;
       
       /* pushing 'GameState' to game memory */
       {
@@ -602,11 +610,9 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
       DWORD data[] = {0, 2, 4, 6, 8, 10};
       DWORD data_size;
       S32 i;
-      wchar_t file_path[MAX_PATH];
       
       data_size = ARRAY_COUNT(data);
-      win32_build_root_path_for_file(file_path, ARRAY_COUNT(file_path), L"random_data.txt");
-      if (win32_debug_write_entire_file(file_path, data_size, data)) {
+      if (win32_debug_write_entire_file(L"random_data.txt", data_size, data)) {
         i = 1;
       }
     }
@@ -713,7 +719,6 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
           ASSERT(QueryPerformanceCounter(&current_perf_counter) != 0, L"Couldn't get processor \'performance counter\' - \'QueryPerformanceCounter(...)\' shouldn't return 0!"); /* @IMPORTANT: Maybe do something smart here if it fails for some reason */
           
           perf_counter_diff.QuadPart = current_perf_counter.QuadPart - last_perf_counter.QuadPart; /* counts elapsed */
-          //game_state->random_seed = CAST(U32) perf_counter_diff.QuadPart;
           global_random_seed = CAST(U32) perf_counter_diff.QuadPart;
           elapsed_secs = CAST(float) perf_counter_diff.QuadPart / CAST(float) perf_frequency.QuadPart; /* counts per second */
           elapsed_ms          = elapsed_secs * 1000.0f;

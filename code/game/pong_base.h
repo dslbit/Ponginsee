@@ -43,6 +43,10 @@
 
 #define PI 3.1415926535f
 
+#define KILOBYTE(_x) ((_x) * 1024LL)
+#define MEGABYTE(_x) (KILOBYTE((_x)) * 1024LL)
+#define GIGABYTE(_x) (MEGABYTE((_x)) * 1024LL)
+
 #define STRINGIFY_HELPER(_s) #_s
 #define STRINGIFY(_x) STRINGIFY_HELPER(_x)
 

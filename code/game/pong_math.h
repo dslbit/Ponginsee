@@ -5,6 +5,47 @@
 
 EXTERN_OPEN /* extern "C" { */
 
+/*
+-* Vector types
+*/
+
+typedef struct V2 V2;
+struct V2 {
+  F32 x;
+  F32 y;
+};
+
+/*
+-* Matrix types
+*/
+
+typedef struct M2 M2;
+struct M2 {
+  union {
+    F32 e[2][2];
+    struct {
+      F32 _00;
+      F32 _01;
+      F32 _10;
+      F32 _11;
+    };
+  };
+};
+
+/*
+-* Shape types
+*/
+
+typedef struct Rect2 Rect2;
+struct Rect2 {
+  V2 p[4];
+};
+
+
+/*
+-* Scalars
+*/
+
 INTERNAL INLINE U32 truncate_u64_to_u32(U64 value) {
   U32 result;
   
@@ -63,13 +104,9 @@ INTERNAL INLINE F32 rad_to_deg(F32 rad) {
   return result;
 }
 
-
-
-typedef struct V2 V2;
-struct V2 {
-  F32 x;
-  F32 y;
-};
+/*
+-* 2D Vectors
+*/
 
 INTERNAL INLINE V2 v2_create(F32 x, F32 y) {
   V2 result;
@@ -158,20 +195,9 @@ INTERNAL INLINE F32 v2_angle(V2 a) {
   return result;
 }
 
-
-
-typedef struct M2 M2;
-struct M2 {
-  union {
-    F32 e[2][2];
-    struct {
-      F32 _00;
-      F32 _01;
-      F32 _10;
-      F32 _11;
-    };
-  };
-};
+/*
+-* 2D Matrices
+*/
 
 INTERNAL INLINE M2 m2_create(F32 _00, F32 _01, F32 _10, F32 _11) {
   M2 result;
@@ -190,12 +216,9 @@ INTERNAL INLINE V2 m2_mul_v2(M2 m, V2 v) {
   return result;
 }
 
-
-
-typedef struct Rect2 Rect2;
-struct Rect2 {
-  V2 p[4];
-};
+/*
+-* Polygon shapes
+*/
 
 INTERNAL INLINE Rect2 rect2_create(V2 min, V2 max) {
   Rect2 result;
@@ -206,6 +229,5 @@ INTERNAL INLINE Rect2 rect2_create(V2 min, V2 max) {
   result.p[3] = v2_create(min.x, max.y);
   return result;
 }
-
 EXTERN_CLOSE /* } */
 #endif /* PONG_MATH_H */
