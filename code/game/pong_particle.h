@@ -38,7 +38,6 @@ INTERNAL ParticleSystem particle_system_create(GameMemory *mem, B32 is_ready_for
   ps.particles_count = particles_count;
   ps.particles = game_memory_push(mem, (particles_count * sizeof(Particle)));
   for (i = 0; i < particles_count; ++i) {
-    /* ps.particles[i].vel = ; */ /* TODO: Random number generator */
     ps.particles[i].pos = ps.pos;
     ps.particles[i].width = particles_width;
     ps.particles[i].height = particles_height;

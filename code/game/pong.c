@@ -1,7 +1,8 @@
 /*
 -* TODO LIST:
--*  |_-> Platform independent file I/O - to load textures/bitmaps
--*
+-*  |_-> Make a rect bound (in-game) of the screen to shake it when players hit the ball (juice)
+-*  |_-> +1 effect for points when player hit the ball (juice)
+-* 
 -*  |_-> Pull out the entity vs arena code? Maybe return a v2 -1 to 1 range to
 -*  identify where entity was before going out of bounds
 -*
@@ -17,7 +18,6 @@
 -*
 -*  |_-> On/Off features (particles, bounce effects, ddp effects, etc.)
 -*   |_> Also display that in the F3 (debug) state of the engine/game.
--*  |_-> Rotated rects
 -*  |_-> Figure out text rendering (Bitmap & TrueType)
 -*   |_-> Show debug info in-game
 -*  |_-> Debug simplified console
