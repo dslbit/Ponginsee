@@ -117,6 +117,23 @@ INTERNAL void *win32_debug_read_entire_file(wchar_t *file_full_path) {
   return result;
 }
 
+INTERNAL BOOL win32_debug_write_entire_file(wchar_t *file_full_path, DWORD data_size, void *file_data) {
+  HANDLE file_handle;
+  BOOL result;
+  DWORD bytes_written;
+  
+  file_handle = CreateFileW(file_full_path, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
+  if (file_handle == INVALID_HANDLE_VALUE) {
+    ASSERT(file_handle != INVALID_HANDLE_VALUE, L"Failed to open a file handle for writing data.");
+    return 0;
+  }
+  bytes_written = 0;
+  result = WriteFile(file_handle, file_data, data_size, &bytes_written, 0);
+  ASSERT(data_size == bytes_written, L"Failed to write to the file.");
+  CloseHandle(file_handle);
+  return result;
+}
+
 INTERNAL void win32_debug_free_entire_file(void *file_ptr) {
   if (file_ptr) {
     VirtualFree(file_ptr, 0, MEM_RELEASE);
@@ -582,15 +599,16 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
     
     /* File I/O TEST */
     {
-      void *file_memory;
+      DWORD data[] = {0, 2, 4, 6, 8, 10};
+      DWORD data_size;
       S32 i;
       wchar_t file_path[MAX_PATH];
       
-      win32_build_root_path_for_file(file_path, ARRAY_COUNT(file_path), L"pong.dll");
-      file_memory = win32_debug_read_entire_file(file_path);
-      i = 0;
-      win32_debug_free_entire_file(file_memory);
-      i = 1;
+      data_size = ARRAY_COUNT(data);
+      win32_build_root_path_for_file(file_path, ARRAY_COUNT(file_path), L"random_data.txt");
+      if (win32_debug_write_entire_file(file_path, data_size, data)) {
+        i = 1;
+      }
     }
     
     win32_build_root_path_for_file(game_dll_full_path, ARRAY_COUNT(game_dll_full_path), L"pong.dll");
