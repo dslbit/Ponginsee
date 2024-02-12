@@ -25,7 +25,10 @@ __debugbreak();\
 *((int *) 0) = 0;\
 }
 #else
-#define ASSERT(_exp)
+#if defined(ASSERT)
+#undef ASSERT
+#endif
+#define ASSERT(_exp, _msg)
 #endif /* defined(WIN32_DEBUG) */
 
 #define WIN32_ID_TIMER_MAIN_FIBER 1
@@ -116,12 +119,16 @@ PLATFORM_READ_ENTIRE_FILE_PROTOTYPE(win32_debug_read_entire_file) {
     ASSERT(file_handle != INVALID_HANDLE_VALUE, L"Failed to open a file for reading.");
     return result;
   }
-  ASSERT(GetFileSizeEx(file_handle, &file_size) != 0, L"Failed to get the file size.");
+  if (GetFileSizeEx(file_handle, &file_size) == 0) {
+    ASSERT(0, L"Failed to get the file size.");
+  }
   result.data_size = file_size.QuadPart;
   result.data = VirtualAlloc(0, file_size.QuadPart, (MEM_RESERVE | MEM_COMMIT), PAGE_READWRITE); /* NOTE: because this is a debug function, this isn't a great deal */
   if (result.data != 0) {
     DWORD bytes_read;
-    ASSERT(ReadFile(file_handle, result.data, truncate_u64_to_u32(file_size.QuadPart), &bytes_read, 0) != 0, L"");
+    if (ReadFile(file_handle, result.data, truncate_u64_to_u32(file_size.QuadPart), &bytes_read, 0) == 0) {
+      ASSERT(0, L"Failed to read the file.");
+    }
   }
   CloseHandle(file_handle);
   return result;
@@ -154,8 +161,10 @@ INTERNAL Win32GameCode win32_load_game_code(wchar_t *dll_full_path, wchar_t *tem
     /* Getting the dll last written time */
     {
       WIN32_FILE_ATTRIBUTE_DATA dll_attributes = {0};
+      DWORD result;
       
-      ASSERT(GetFileAttributesExW(dll_full_path, GetFileExInfoStandard, &dll_attributes) != 0, L"Couldn't get the game dll file attributes!");
+      result = GetFileAttributesExW(dll_full_path, GetFileExInfoStandard, &dll_attributes);
+      ASSERT(result != 0, L"Couldn't get the game dll file attributes!");
       game_code.dll_last_write_time = dll_attributes.ftLastWriteTime;
     }
     
@@ -480,15 +489,20 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
   {
     int i, last_backslash_index;
     wchar_t path[MAX_PATH] = {0};
+    DWORD result;
     
-    ASSERT(GetModuleFileNameW(0, path, ARRAY_COUNT(path)) != 0, L"Couldn't ge the executable file path using 'GetModuleFileNameW(...)'!");
+    result = GetModuleFileNameW(0, path, ARRAY_COUNT(path));
+    ASSERT(result != 0, L"Couldn't ge the executable file path using 'GetModuleFileNameW(...)'!");
     last_backslash_index = 0;
     for (i = 0; (i < ARRAY_COUNT(path)) && (path[i] != '\0'); ++i) {
       if (path[i] == '\\') {
         last_backslash_index = i;
       }
     }
-    ASSERT( ( ARRAY_COUNT(global_state.root_path) == ARRAY_COUNT(path) ), L"Size of 'global_path_to_exe_root' should be the same as 'path'!");
+    if (ARRAY_COUNT(global_state.root_path) != ARRAY_COUNT(path)) {
+      ASSERT(0, L"Size of 'global_path_to_exe_root' should be the same as 'path'!");
+      return 1;
+    }
     for (i = 0; i < last_backslash_index; ++i) {
       global_state.root_path[i] = path[i];
     }
@@ -628,12 +642,18 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
       TIMECAPS machine_timing_caps;
       
       /* @IMPORTANT: Actually this is fine if it fails, in the future just set to 1 by default, but for now I'll do this way in debug mode. */
-      ASSERT(timeGetDevCaps(&machine_timing_caps, sizeof(machine_timing_caps)) == MMSYSERR_NOERROR, L"Couldn't get machine timing capabilities using 'timeGetDevCaps(...)'!");
-      ASSERT(timeBeginPeriod(MIN(machine_timing_caps.wPeriodMin, machine_timing_caps.wPeriodMax)) == TIMERR_NOERROR, L"Couldn't set the Windows' timer resoltuion using 'timeBeginPeriod(...)'!");
+      if (timeGetDevCaps(&machine_timing_caps, sizeof(machine_timing_caps)) != MMSYSERR_NOERROR) {
+        ASSERT(0, L"Couldn't get machine timing capabilities using 'timeGetDevCaps(...)'!");
+        return 1;
+      }
+      if (timeBeginPeriod(MIN(machine_timing_caps.wPeriodMin, machine_timing_caps.wPeriodMax)) != TIMERR_NOERROR) {
+        ASSERT(0, L"Couldn't set the Windows' timer resoltuion using 'timeBeginPeriod(...)'!");
+        return 1;
+      }
       sleep_granularity = MIN(machine_timing_caps.wPeriodMin, machine_timing_caps.wPeriodMax);
     }
-    ASSERT(QueryPerformanceFrequency(&perf_frequency) != 0, L"Couldn't get processor \'performance frequency\' - \'QueryPerformanceFrequency(...)\' shouldn't return 0!"); /* this is the CPU ticks_per_second capability - @IMPORTANT: maybe do some crazy shit if this fails */
-    ASSERT(QueryPerformanceCounter(&last_perf_counter) != 0, L"Couldn't get processor \'performance counter\' - \'QueryPerformanceCounter(...)\' shouldn't return 0!");
+    QueryPerformanceFrequency(&perf_frequency);
+    QueryPerformanceCounter(&last_perf_counter);
     dt = 0.0f;
     global_state.is_running = TRUE;
     while (global_state.is_running) {
@@ -642,8 +662,10 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
 #if defined(WIN32_DEBUG)
         FILETIME current_dll_file_time = {0};
         WIN32_FILE_ATTRIBUTE_DATA dll_attributes = {0};
+        DWORD result;
         
-        ASSERT(GetFileAttributesExW(game_dll_full_path, GetFileExInfoStandard, &dll_attributes) != 0, L"Couldn't get the game dll file attributes!");
+        result = GetFileAttributesExW(game_dll_full_path, GetFileExInfoStandard, &dll_attributes);
+        ASSERT(result != 0, L"Couldn't get the game dll file attributes!");
         current_dll_file_time = dll_attributes.ftLastWriteTime;
         if (CompareFileTime(&current_dll_file_time, &game_code.dll_last_write_time) != 0) {
           U32 load_try_index;
@@ -701,7 +723,6 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
         /* Display the 'back_buffer' in window */
         {
           window_dc = GetDC(window); /* NOTE: Maybe this isn't necessary at all, since I'll do the rendering myself, I don't really need to release the DC everyframe. - @IMPORTANT: Investigate. */
-          /*ASSERT(window_dc != 0);*/
           /* NOTE: BitBlt is faster than SctretchDIBits, maybe, in the future, change to BitBlt and do a bitmap resize by hand for the 'front buffer'? */
           StretchDIBits(window_dc, global_state.front_buffer_xoffset, global_state.front_buffer_yoffset, global_state.front_buffer_width, global_state.front_buffer_height, 0, 0, game_back_buffer->width, game_back_buffer->height, game_back_buffer->memory, &global_state.back_buffer.bmp_info, DIB_RGB_COLORS, SRCCOPY);
           if (window_dc != 0) { /* This check exist's because when the window minimized this is 0 */
@@ -716,7 +737,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
           LOCAL float elapsed_secs, elapsed_ms, elapsed_microsecs, elapsed_nanosecs = 0.0f;
           LOCAL int fps;
           
-          ASSERT(QueryPerformanceCounter(&current_perf_counter) != 0, L"Couldn't get processor \'performance counter\' - \'QueryPerformanceCounter(...)\' shouldn't return 0!"); /* @IMPORTANT: Maybe do something smart here if it fails for some reason */
+          QueryPerformanceCounter(&current_perf_counter);
           
           perf_counter_diff.QuadPart = current_perf_counter.QuadPart - last_perf_counter.QuadPart; /* counts elapsed */
           global_random_seed = CAST(U32) perf_counter_diff.QuadPart;
@@ -734,18 +755,18 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
             LOCAL F32 elapsed_to_desired_ms_diff;
             
             desired_ms_per_frame = 1000.0f / CAST(F32) monitor_refresh_rate; /* @CLEANUP: no need to calc every frame */
-            ASSERT(QueryPerformanceCounter(&current_perf_counter) != 0, L"Couldn't get processor \'performance counter\' - \'QueryPerformanceCounter(...)\' shouldn't return 0!");
+            QueryPerformanceCounter(&current_perf_counter);
             elapsed_ms = ((current_perf_counter.QuadPart - last_perf_counter.QuadPart) * 1000.0f) / (F32) perf_frequency.QuadPart;
             elapsed_to_desired_ms_diff = (desired_ms_per_frame - elapsed_ms);
             if (elapsed_ms < desired_ms_per_frame) {
               Sleep(CAST(S32) elapsed_to_desired_ms_diff);
               
-              ASSERT(QueryPerformanceCounter(&current_perf_counter) != 0, L"Couldn't get processor \'performance counter\' - \'QueryPerformanceCounter(...)\' shouldn't return 0!");
+              QueryPerformanceCounter(&current_perf_counter);
               elapsed_ms = ((current_perf_counter.QuadPart - last_perf_counter.QuadPart) * 1000.0f) / (F32) perf_frequency.QuadPart;
               elapsed_to_desired_ms_diff = (desired_ms_per_frame - elapsed_ms);
               ASSERT(elapsed_to_desired_ms_diff < desired_ms_per_frame, L"Game loop slept for too long, that's bad!");
               while (elapsed_ms < desired_ms_per_frame) {
-                ASSERT(QueryPerformanceCounter(&current_perf_counter) != 0, L"Couldn't get processor \'performance counter\' - \'QueryPerformanceCounter(...)\' shouldn't return 0!");
+                QueryPerformanceCounter(&current_perf_counter);
                 elapsed_ms = ((current_perf_counter.QuadPart - last_perf_counter.QuadPart) * 1000.0f) / (F32) perf_frequency.QuadPart;
               }
             } else {
