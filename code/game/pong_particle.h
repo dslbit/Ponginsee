@@ -56,7 +56,6 @@ INTERNAL void particle_system_update(ParticleSystem *ps, F32 dt) {
 #endif
   
   if (ps->is_initialized && ps->is_ready_for_emission) {
-    /* TODO: make use of particle's life & pos integration */
     for (i = 0; i < ps->particles_count; ++i) {
       p = &ps->particles[i];
       if (p->life <= 0) {

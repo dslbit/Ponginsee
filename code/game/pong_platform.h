@@ -89,10 +89,9 @@ entities - Right? */
   Entity ball;
 };
 
-#define GAME_UPDATE_AND_RENDER_PROTOTYPE(_name) void _name(GameBackBuffer *back_buffer, GameInput *input, GameMemory *memory)
-typedef GAME_UPDATE_AND_RENDER_PROTOTYPE(GameUpdateAndRenderFuncType);
+typedef void GameUpdateAndRenderFuncType(GameBackBuffer *back_buffer, GameInput *input, GameMemory *memory);
+void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameMemory *memory);
 
-GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render);
 
 EXTERN_CLOSE /* } */
 

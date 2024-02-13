@@ -34,6 +34,7 @@
 #include "pong_math.h"
 #include "pong_color.h"
 #include "pong_memory.h"
+#include "pong_texture_loader.h"
 #include "pong_particle.h"
 #include "pong_entity.h"
 #include "pong_collision.h"
@@ -47,8 +48,10 @@ INTERNAL void level_test(GameBackBuffer *back_buffer, GameInput *input, GameMemo
 INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameMemory *memory);
 INTERNAL void level_horizontal_classic(GameBackBuffer *back_buffer, GameInput *input, GameMemory *memory);
 INTERNAL void level_end(GameBackBuffer *back_buffer, GameInput *input, GameMemory *memory);
-
+/*
 GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
+*/
+void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameMemory *memory) {
   GameState *state;
   
   ASSERT(sizeof(GameState) < memory->max_size, L"NOT ENOUGH MEMORY!");

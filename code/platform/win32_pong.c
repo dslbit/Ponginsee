@@ -18,17 +18,19 @@
 #if defined(ASSERT)
 #undef ASSERT
 #endif
-
 #define ASSERT(_exp, _msg) if (!(_exp)) {\
 MessageBoxW(0, L"Expression: " STRINGIFY(_exp) L"\n" _msg L"\n\nAt line: " STRINGIFY(__LINE__) L"\n\nIn: " __FILE__, L"Assertion Failed", (MB_ICONERROR | MB_OK));\
 __debugbreak();\
 *((int *) 0) = 0;\
 }
-#else
+
+#else /* #if defined(WIN32_DEBUG) */
+
 #if defined(ASSERT)
 #undef ASSERT
 #endif
 #define ASSERT(_exp, _msg)
+
 #endif /* defined(WIN32_DEBUG) */
 
 #define WIN32_ID_TIMER_MAIN_FIBER 1
@@ -44,7 +46,9 @@ __debugbreak();\
 #define WIN32_BACK_BUFFER_BYTES_PER_PIXEL (WIN32_BACK_BUFFER_BITS_PER_PIXEL / 8)
 #define WIN32_BACK_BUFFER_STRIDE (WIN32_BACK_BUFFER_WIDTH * WIN32_BACK_BUFFER_BYTES_PER_PIXEL)
 
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <timeapi.h>
 #include <strsafe.h>
 #include <wchar.h>
 #include <windowsx.h>
@@ -101,17 +105,17 @@ INTERNAL void win32_build_root_path_for_file(wchar_t *full_path, S32 full_path_l
 }
 
 
-PLATFORM_FREE_ENTIRE_FILE_PROTOTYPE(win32_debug_free_entire_file) {
+void win32_debug_free_entire_file(void *address) {
   if (address) {
     VirtualFree(address, 0, MEM_RELEASE);
   }
 }
 
-PLATFORM_READ_ENTIRE_FILE_PROTOTYPE(win32_debug_read_entire_file) {
+ReadFileResult win32_debug_read_entire_file(U16 *file_name) {
   HANDLE file_handle;
-  LARGE_INTEGER file_size;
+  LARGE_INTEGER file_size = {0};
   ReadFileResult result = {0};
-  wchar_t file_full_path[MAX_PATH];
+  wchar_t file_full_path[MAX_PATH] = {0};
   
   win32_build_root_path_for_file(file_full_path, ARRAY_COUNT(file_full_path), file_name);
   file_handle = CreateFileW(file_full_path, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
@@ -122,7 +126,7 @@ PLATFORM_READ_ENTIRE_FILE_PROTOTYPE(win32_debug_read_entire_file) {
   if (GetFileSizeEx(file_handle, &file_size) == 0) {
     ASSERT(0, L"Failed to get the file size.");
   }
-  result.data_size = file_size.QuadPart;
+  result.data_size = truncate_u64_to_u32(file_size.QuadPart); /* safe truncation */
   result.data = VirtualAlloc(0, file_size.QuadPart, (MEM_RESERVE | MEM_COMMIT), PAGE_READWRITE); /* NOTE: because this is a debug function, this isn't a great deal */
   if (result.data != 0) {
     DWORD bytes_read;
@@ -134,11 +138,11 @@ PLATFORM_READ_ENTIRE_FILE_PROTOTYPE(win32_debug_read_entire_file) {
   return result;
 }
 
-PLATFORM_WRITE_ENTIRE_FILE_PROTOTYPE(win32_debug_write_entire_file) {
+B32 win32_debug_write_entire_file(U16 *file_name, U32 data_size, void *data) {
   HANDLE file_handle;
   BOOL result;
   DWORD bytes_written;
-  wchar_t file_full_path[MAX_PATH];
+  wchar_t file_full_path[MAX_PATH] = {0};
   
   win32_build_root_path_for_file(file_full_path, ARRAY_COUNT(file_full_path), file_name);
   file_handle = CreateFileW(file_full_path, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
@@ -198,6 +202,15 @@ INTERNAL void win32_unload_game_code(Win32GameCode *game_code) {
   game_code->is_valid = FALSE;
   game_code->update_and_render = 0;
 }
+
+#if 0
+INTERNAL Texture win32_load_bitmap(wchar_t *file_name) {
+  ReadFileResult bitmap;
+  
+  bitmap = win32_debug_read_entire_file(file_name);
+  
+}
+#endif
 
 INTERNAL void win32_change_key_state(GameButtonState *button, B32 pressed, B32 released) {
   ASSERT(button != 0, L"'win32_key_event_helper' failed! Null 'button'!");
@@ -617,18 +630,6 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
       window_dc = GetDC(window);
       monitor_refresh_rate = GetDeviceCaps(window_dc, VREFRESH); /* NOTE: User's primary monitor */
       ASSERT((monitor_refresh_rate >= 30), L"Your primary monitor refresh rate is less than 30Hz, you wouldn't be able to experience the game well, so the application will be closed!");
-    }
-    
-    /* File I/O TEST */
-    {
-      DWORD data[] = {0, 2, 4, 6, 8, 10};
-      DWORD data_size;
-      S32 i;
-      
-      data_size = ARRAY_COUNT(data);
-      if (win32_debug_write_entire_file(L"random_data.txt", data_size, data)) {
-        i = 1;
-      }
     }
     
     win32_build_root_path_for_file(game_dll_full_path, ARRAY_COUNT(game_dll_full_path), L"pong.dll");
