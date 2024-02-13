@@ -214,6 +214,25 @@ INTERNAL INLINE void renderer_debug_particles(GameBackBuffer *back_buffer, Parti
   }
 }
 
+INTERNAL INLINE void renderer_debug_texture(GameBackBuffer *back_buffer, Texture texture, F32 start_x, F32 start_y) {
+  S32 x, y;
+  S32 j, i;
+  U32 *pixel;
+  U32 *bmp_pixel;
+  
+  x = round_f32_to_s32(start_x);
+  y = round_f32_to_s32(start_y);
+  for (i = y; (i < (y + texture.height)) && (i < back_buffer->height); ++i) {
+    pixel = (CAST(U32 *) back_buffer->memory) + (i * back_buffer->width) + x;
+    bmp_pixel = CAST(U32 *) texture.data + ((texture.width * texture.height) - texture.width * (i - y + 1)); /* flip y texture axis */
+    for (j = x; (j < (x + texture.width)) && (j < back_buffer->width); ++j) {
+      *pixel = *(CAST(U32 *) bmp_pixel);
+      pixel++;
+      bmp_pixel++;
+    }
+  }
+}
+
 EXTERN_CLOSE /* } */
 
 #endif /* PONG_RENDERER_H */

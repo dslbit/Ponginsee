@@ -203,15 +203,6 @@ INTERNAL void win32_unload_game_code(Win32GameCode *game_code) {
   game_code->update_and_render = 0;
 }
 
-#if 0
-INTERNAL Texture win32_load_bitmap(wchar_t *file_name) {
-  ReadFileResult bitmap;
-  
-  bitmap = win32_debug_read_entire_file(file_name);
-  
-}
-#endif
-
 INTERNAL void win32_change_key_state(GameButtonState *button, B32 pressed, B32 released) {
   ASSERT(button != 0, L"'win32_key_event_helper' failed! Null 'button'!");
   button->pressed = pressed;

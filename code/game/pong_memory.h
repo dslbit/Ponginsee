@@ -23,12 +23,12 @@ struct GameMemory {
   PlatformWriteEntireFileFuncType *platform_write_entire_file;
 };
 
-INTERNAL INLINE void *game_memory_push(GameMemory *mem, U64 push_size) {
+INTERNAL INLINE void *game_memory_push(GameMemory *memory, U64 push_size) {
   void *result;
   
-  if (mem->max_size - mem->current_size > push_size) {
-    result = CAST(void *) (CAST(U8 *) mem->address + mem->current_size);
-    mem->current_size += push_size;
+  if (memory->max_size - memory->current_size > push_size) {
+    result = CAST(void *) (CAST(U8 *) memory->address + memory->current_size);
+    memory->current_size += push_size;
   } else {
     ASSERT(0, L"Game needs more memory!");
   }

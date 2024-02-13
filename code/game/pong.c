@@ -59,12 +59,11 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
   if (!state->is_initialized) {
     state->is_initialized = TRUE;
     
-    /* Platform-independent file I/O test */
+    /* test the load bmp win32 function */
     {
-      ReadFileResult file = {0};
+      Texture test;
       
-      file = memory->platform_read_entire_file(L"pong.dll");
-      memory->platform_free_entire_file(file.data);
+      test = load_bitmap(memory, L"test2.bmp");
     }
     
     state->game_debug_state.is_on = FALSE;
@@ -279,6 +278,8 @@ INTERNAL void level_test(GameBackBuffer *back_buffer, GameInput *input, GameMemo
     state->recty_width = 100.0f;
     state->recty_height = 75.0f;
     state->recty_rotation = 0.0f;
+    
+    state->temp_texture = load_bitmap(memory, L"test3.bmp");
   }
   
   /* Test level: update */
@@ -289,6 +290,8 @@ INTERNAL void level_test(GameBackBuffer *back_buffer, GameInput *input, GameMemo
   /* Test level: render */
   {
     renderer_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, state->background_color);
+    
+    renderer_debug_texture(back_buffer, state->temp_texture, 10, 10);
     
     renderer_filled_rotated_rect(back_buffer, state->recty_x, state->recty_y, state->recty_width, state->recty_height, state->recty_rotation, color_create_from_rgba(127, 127, 127, 127));
 #if 1
