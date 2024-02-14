@@ -219,6 +219,8 @@ INTERNAL INLINE void renderer_debug_texture(GameBackBuffer *back_buffer, Texture
   S32 j, i;
   U32 *pixel;
   U32 *bmp_pixel;
+  F32 r, g, b, a;
+  F32 dest_r, dest_g, dest_b;
   
   x = round_f32_to_s32(start_x);
   y = round_f32_to_s32(start_y);
@@ -226,7 +228,19 @@ INTERNAL INLINE void renderer_debug_texture(GameBackBuffer *back_buffer, Texture
     pixel = (CAST(U32 *) back_buffer->memory) + (i * back_buffer->width) + x;
     bmp_pixel = CAST(U32 *) texture.data + ((texture.width * texture.height) - texture.width * (i - y + 1)); /* flip y texture axis */
     for (j = x; (j < (x + texture.width)) && (j < back_buffer->width); ++j) {
-      *pixel = *(CAST(U32 *) bmp_pixel);
+      r = (*bmp_pixel >> 16 & 0xFF) / 255.0f;
+      g = (*bmp_pixel >> 8 & 0xFF) / 255.0f;
+      b = (*bmp_pixel >> 0 & 0xFF) / 255.0f;
+      a = (*bmp_pixel >> 24 & 0xFF) / 255.0f;
+      
+      dest_r = (*pixel >> 16 & 0xFF) / 255.0f;
+      dest_g = (*pixel >> 8 & 0xFF) / 255.0f;
+      dest_b = (*pixel >> 0 & 0xFF) / 255.0f;
+      
+      r = (1.0f - a)*dest_r + a*r;
+      g = (1.0f - a)*dest_g + a*g;
+      b = (1.0f - a)*dest_b + a*b;
+      *pixel = (round_f32_to_u32(r * 255.0f) << 16 | round_f32_to_u32(g * 255.0f) << 8 | round_f32_to_u32(b * 255.0f) << 0 | round_f32_to_u32(a * 255.0f) << 24);
       pixel++;
       bmp_pixel++;
     }
