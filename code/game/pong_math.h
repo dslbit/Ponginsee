@@ -90,6 +90,20 @@ INTERNAL INLINE U32 round_f32_to_u32(F32 value) {
   return result;
 }
 
+INTERNAL INLINE F32 sin_f32(F32 a) {
+  F32 result;
+  
+  result = sinf(a);
+  return result;
+}
+
+INTERNAL INLINE F32 cos_f32(F32 a) {
+  F32 result;
+  
+  result = cosf(a);
+  return result;
+}
+
 INTERNAL INLINE F32 deg_to_rad(F32 deg) {
   F32 result;
   
@@ -101,6 +115,13 @@ INTERNAL INLINE F32 rad_to_deg(F32 rad) {
   F32 result;
   
   result = rad * (180.0f / PI);
+  return result;
+}
+
+INTERNAL INLINE F32 map_f32_into_range(F32 value, F32 min, F32 max) { /* maps value [0 ... 1] */
+  F32 result;
+  
+  result = CLAMP((value - min) / (max - min), 0, 1);
   return result;
 }
 

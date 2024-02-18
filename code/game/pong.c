@@ -1,5 +1,7 @@
 /*
 -* TODO LIST:
+-*  |_-> Texture rendering with rotation and relative coordinate system (UV) for scaled bitmaps
+-*
 -*  |_-> Make a rect bound (in-game) of the screen to shake it when players hit the ball (juice)
 -*  |_-> +1 effect for points when player hit the ball (juice)
 -* 
@@ -273,13 +275,8 @@ INTERNAL void level_test(GameBackBuffer *back_buffer, GameInput *input, GameMemo
     state->game_level.is_running = TRUE;
     state->game_level.time_elapsed = 0.0f;
     
-    state->recty_x = back_buffer->width / 2.0f;
-    state->recty_y = back_buffer->height / 2.0f;
-    state->recty_width = 100.0f;
-    state->recty_height = 75.0f;
-    state->recty_rotation = 0.0f;
-    
     state->temp_texture = load_bitmap(memory, L"test3.bmp");
+    state->temp_texture_scale = 0.0f;
   }
   
   /* Test level: update */
@@ -291,14 +288,12 @@ INTERNAL void level_test(GameBackBuffer *back_buffer, GameInput *input, GameMemo
   {
     renderer_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, state->background_color);
     
-    renderer_debug_texture(back_buffer, state->temp_texture, 10, 10);
-    
-    renderer_filled_rotated_rect(back_buffer, state->recty_x, state->recty_y, state->recty_width, state->recty_height, state->recty_rotation, color_create_from_rgba(127, 127, 127, 127));
-#if 1
-    if (state->game_debug_state.accumulated_dt > 1.0f) {
-      state->recty_rotation += input->dt*20.0f;
+    renderer_texture(back_buffer, state->temp_texture, 10, 10, 50+state->temp_texture_scale, 50+state->temp_texture_scale);
+    if (state->temp_texture_scale < 300) {
+      state->temp_texture_scale += input->dt*30;
+    } else {
+      state->temp_texture_scale = 0;
     }
-#endif
   }
 }
 

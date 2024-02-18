@@ -78,8 +78,8 @@ struct GameState {
   F32 score_rect_height;
   
   /* NOTE: TEMPORARY - Test level data */
-  F32 recty_x, recty_y, recty_width, recty_height, recty_rotation;
   Texture temp_texture;
+  F32 temp_texture_scale;
   
   GameColor background_color;
   GameColor background_color_paused;

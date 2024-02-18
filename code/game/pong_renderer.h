@@ -3,7 +3,7 @@
 
 EXTERN_OPEN /* extern "C" { */
 
-INTERNAL void renderer_pixel(GameBackBuffer *back_buffer, S32 x, S32 y, GameColor color) {
+INTERNAL INLINE void renderer_pixel(GameBackBuffer *back_buffer, S32 x, S32 y, GameColor color) {
   U32 *pixel;
   U32 color_u32;
   
@@ -214,7 +214,7 @@ INTERNAL INLINE void renderer_debug_particles(GameBackBuffer *back_buffer, Parti
   }
 }
 
-INTERNAL INLINE void renderer_debug_texture(GameBackBuffer *back_buffer, Texture texture, F32 start_x, F32 start_y) {
+INTERNAL void renderer_debug_texture(GameBackBuffer *back_buffer, Texture texture, F32 start_x, F32 start_y) {
   S32 x, y;
   S32 j, i;
   U32 *pixel;
@@ -226,7 +226,7 @@ INTERNAL INLINE void renderer_debug_texture(GameBackBuffer *back_buffer, Texture
   y = round_f32_to_s32(start_y);
   for (i = y; (i < (y + texture.height)) && (i < back_buffer->height); ++i) {
     pixel = (CAST(U32 *) back_buffer->memory) + (i * back_buffer->width) + x;
-    bmp_pixel = CAST(U32 *) texture.data + ((texture.width * texture.height) - texture.width * (i - y + 1)); /* flip y texture axis */
+    bmp_pixel = CAST(U32 *) texture.data + ((texture.width * texture.height) - texture.width * (i - y + 1)); /* y top-left */
     for (j = x; (j < (x + texture.width)) && (j < back_buffer->width); ++j) {
       r = (*bmp_pixel >> 16 & 0xFF) / 255.0f;
       g = (*bmp_pixel >> 8 & 0xFF) / 255.0f;
@@ -243,6 +243,55 @@ INTERNAL INLINE void renderer_debug_texture(GameBackBuffer *back_buffer, Texture
       *pixel = (round_f32_to_u32(r * 255.0f) << 16 | round_f32_to_u32(g * 255.0f) << 8 | round_f32_to_u32(b * 255.0f) << 0 | round_f32_to_u32(a * 255.0f) << 24);
       pixel++;
       bmp_pixel++;
+    }
+  }
+}
+
+INTERNAL void renderer_texture(GameBackBuffer *back_buffer, Texture texture, F32 start_x, F32 start_y, F32 width, F32 height) {
+  S32 x, y, w, h;
+  S32 uv_x, uv_y;
+  S32 j, i;
+  U32 *pixel;
+  U32 *bmp_pixel;
+  F32 mapped_range_x, mapped_range_y;
+  F32 r, g, b, a;
+  F32 dest_r, dest_g, dest_b;
+  
+  i = j = 0;
+  mapped_range_x = mapped_range_y = 0;
+  x = round_f32_to_s32(start_x);
+  y = round_f32_to_s32(start_y);
+  w = round_f32_to_s32(width);
+  h = round_f32_to_s32(height);
+  for (i = y; (i < (y + h)) && (i < back_buffer->height); ++i) {
+    pixel = (CAST(U32 *) back_buffer->memory) + (i * back_buffer->width) + x;
+    
+    mapped_range_x = map_f32_into_range(CAST(F32)j, start_x, start_x+width);
+    mapped_range_y = map_f32_into_range(CAST(F32)i, start_y, start_y+height);
+    uv_x = truncate_f32(texture.width * mapped_range_x);
+    uv_y = truncate_f32(texture.height * mapped_range_y);
+    /* bmp_pixel = CAST(U32 *)texture.data + (uv_y * texture.width) + uv_x; */ /* default y bottom-left */
+    bmp_pixel = CAST(U32 *) texture.data + ((texture.width * texture.height) - texture.width * (uv_y + 1)); /* y top-left */
+    for (j = x; (j < (x + w)) && (j < back_buffer->width); ++j) {
+      mapped_range_x = map_f32_into_range(CAST(F32)j, start_x, start_x+width);
+      uv_x = truncate_f32(texture.width * mapped_range_x);
+      /* bmp_pixel = CAST(U32 *)texture.data + (uv_y * texture.width) + uv_x; */ /* default y bottom-left */
+      bmp_pixel = CAST(U32 *) texture.data + ((texture.width * texture.height) - texture.width * (uv_y + 1)) + uv_x; /* y top-left */
+      
+      r = (*bmp_pixel >> 16 & 0xFF) / 255.0f;
+      g = (*bmp_pixel >> 8 & 0xFF) / 255.0f;
+      b = (*bmp_pixel >> 0 & 0xFF) / 255.0f;
+      a = (*bmp_pixel >> 24 & 0xFF) / 255.0f;
+      
+      dest_r = (*pixel >> 16 & 0xFF) / 255.0f;
+      dest_g = (*pixel >> 8 & 0xFF) / 255.0f;
+      dest_b = (*pixel >> 0 & 0xFF) / 255.0f;
+      
+      r = (1.0f - a)*dest_r + a*r;
+      g = (1.0f - a)*dest_g + a*g;
+      b = (1.0f - a)*dest_b + a*b;
+      *pixel = (round_f32_to_u32(r * 255.0f) << 16 | round_f32_to_u32(g * 255.0f) << 8 | round_f32_to_u32(b * 255.0f) << 0 | round_f32_to_u32(a * 255.0f) << 24);
+      pixel++;
     }
   }
 }
