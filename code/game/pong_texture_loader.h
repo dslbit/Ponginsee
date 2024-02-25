@@ -12,6 +12,7 @@ struct Texture {
   void *data;
 };
 
+/* NOTE: Only accepts ARGB 32-bit '.bmp' files (for now) */
 INTERNAL Texture load_bitmap(GameMemory *memory, U16 *file_name) {
   Texture result = {0};
   ReadFileResult bitmap = {0};

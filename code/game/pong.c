@@ -1,6 +1,6 @@
 /*
 -* TODO LIST:
--*  |_-> Texture rendering with rotation and relative coordinate system (UV) for scaled bitmaps
+-*  |_-> Texture rendering with ( ) rotation and (X) relative coordinate system (UV) for scaled bitmaps
 -*
 -*  |_-> Make a rect bound (in-game) of the screen to shake it when players hit the ball (juice)
 -*  |_-> +1 effect for points when player hit the ball (juice)
@@ -9,7 +9,8 @@
 -*  identify where entity was before going out of bounds
 -*
 -*  |_-> Simple start menu (Play, Quit) and pause menu (Return, Quit), no text
--*  for now, just a visual representation
+-*  for now, just a visual representation - for now I only have the menu state,
+-*  no visual representation at the moment.
 -*
 -*  |_-> Menu screen (Play, Scoreboard (stores personal records), Settings
 -*  (Resolution, Audio, Controls), Quit)
@@ -20,9 +21,9 @@
 -*
 -*  |_-> On/Off features (particles, bounce effects, ddp effects, etc.)
 -*   |_> Also display that in the F3 (debug) state of the engine/game.
--*  |_-> Figure out text rendering (Bitmap & TrueType)
+-*  |_-> Figure out text rendering using () Bitmaps & () TrueType
 -*   |_-> Show debug info in-game
--*  |_-> Debug simplified console
+-*  |_-> Debug simplified console (with support for integers & floating-point numbers)
 -*  |_-> Figure out the sound engine
 -*  |_-> Platform-independent: sound output
 -*
@@ -50,9 +51,7 @@ INTERNAL void level_test(GameBackBuffer *back_buffer, GameInput *input, GameMemo
 INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameMemory *memory);
 INTERNAL void level_horizontal_classic(GameBackBuffer *back_buffer, GameInput *input, GameMemory *memory);
 INTERNAL void level_end(GameBackBuffer *back_buffer, GameInput *input, GameMemory *memory);
-/*
-GAME_UPDATE_AND_RENDER_PROTOTYPE(game_update_and_render) {
-*/
+
 void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameMemory *memory) {
   GameState *state;
   
@@ -61,12 +60,9 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
   if (!state->is_initialized) {
     state->is_initialized = TRUE;
     
-    /* test the load bmp win32 function */
-    {
-      Texture test;
-      
-      test = load_bitmap(memory, L"test2.bmp");
-    }
+    state->bmp_font_default.glyph_width = 8;
+    state->bmp_font_default.glyph_height = 16;
+    state->bmp_font_default.bmp = load_bitmap(memory, GAME_DEFAULT_DATA_RELATIVE_PATH GAME_BMP_FONT_DEFAULT);
     
     state->game_debug_state.is_on = FALSE;
     state->game_debug_state.dt = 0.033333f;
@@ -274,26 +270,17 @@ INTERNAL void level_test(GameBackBuffer *back_buffer, GameInput *input, GameMemo
     state->game_level.is_initialized = TRUE;
     state->game_level.is_running = TRUE;
     state->game_level.time_elapsed = 0.0f;
-    
-    state->temp_texture = load_bitmap(memory, L"test3.bmp");
-    state->temp_texture_scale = 0.0f;
   }
   
   /* Test level: update */
   {
-    state->game_debug_state.accumulated_dt += input->dt;
   }
   
   /* Test level: render */
   {
     renderer_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, state->background_color);
     
-    renderer_texture(back_buffer, state->temp_texture, 10, 10, 50+state->temp_texture_scale, 50+state->temp_texture_scale);
-    if (state->temp_texture_scale < 300) {
-      state->temp_texture_scale += input->dt*30;
-    } else {
-      state->temp_texture_scale = 0;
-    }
+    renderer_text(back_buffer, &state->bmp_font_default, back_buffer->width/2.0f, back_buffer->height/2.0f, L"H");
   }
 }
 

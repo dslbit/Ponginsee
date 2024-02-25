@@ -296,6 +296,35 @@ INTERNAL void renderer_texture(GameBackBuffer *back_buffer, Texture texture, F32
   }
 }
 
+
+INTERNAL void renderer_text(GameBackBuffer *back_buffer, GameBitmapFont *bmp_font, F32 x, F32 y, U16 *text) {
+  S32 back_buffer_xpos, back_buffer_ypos;
+  S32 texture_xpos, texture_ypos;
+  U32 *back_buffer_pixel, *texture_pixel;
+  S32 i, j;
+  
+  back_buffer_xpos = round_f32_to_s32(x);
+  back_buffer_ypos = round_f32_to_s32(y);
+  /* 'text' must be null terminated - just for now, later I'll write a string library */
+  while(*text++) {
+    /* ... */
+    texture_xpos = 0;
+    texture_ypos = 0;
+    
+    if ( (back_buffer_xpos + bmp_font->glyph_width < back_buffer->width) && (back_buffer_ypos + bmp_font->glyph_height < back_buffer->height) ) {
+      for (i = 0; i < bmp_font->glyph_height; ++i) {
+        back_buffer_pixel = CAST(U32 *)back_buffer->memory + ( (back_buffer_ypos + i) * back_buffer->width) + back_buffer_xpos;
+        texture_pixel = CAST(U32 *)bmp_font->bmp.data + ((bmp_font->bmp.width * bmp_font->bmp.height) - bmp_font->bmp.width * (i + 1) + texture_xpos); /* 0,0 is the 'unkown' char */
+        for (j = 0; j < bmp_font->glyph_width; ++j) {
+          *back_buffer_pixel = *texture_pixel;
+          texture_pixel++;
+          back_buffer_pixel++;
+        }
+      }
+    }
+  }
+}
+
 EXTERN_CLOSE /* } */
 
 #endif /* PONG_RENDERER_H */

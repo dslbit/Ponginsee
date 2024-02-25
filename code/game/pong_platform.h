@@ -1,6 +1,9 @@
 #ifndef PONG_PLATFORM_H
 #define PONG_PLATFORM_H
 
+#define GAME_DEFAULT_DATA_RELATIVE_PATH L"..\\data\\"
+#define GAME_BMP_FONT_DEFAULT L"font_8x16.bmp"
+
 EXTERN_OPEN /* extern "C" { */
 
 typedef struct GameBackBuffer GameBackBuffer;
@@ -56,6 +59,14 @@ struct GameInput {
   GameControllerInput player1;
 };
 
+typedef struct GameBitmapFont GameBitmapFont;
+struct GameBitmapFont {
+  S32 glyph_width;
+  S32 glyph_height;
+  /* TODO: Lookup table */
+  Texture bmp;
+};
+
 typedef struct GameDebugState GameDebugState;
 struct GameDebugState {
   B32 is_on;
@@ -78,8 +89,8 @@ struct GameState {
   F32 score_rect_height;
   
   /* NOTE: TEMPORARY - Test level data */
-  Texture temp_texture;
-  F32 temp_texture_scale;
+  GameBitmapFont bmp_font_default;
+  /* --- */
   
   GameColor background_color;
   GameColor background_color_paused;
