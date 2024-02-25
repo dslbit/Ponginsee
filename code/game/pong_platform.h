@@ -2,7 +2,7 @@
 #define PONG_PLATFORM_H
 
 #define GAME_DEFAULT_DATA_RELATIVE_PATH L"..\\data\\"
-#define GAME_BMP_FONT_DEFAULT L"font_8x16.bmp"
+#define GAME_BMP_FONT_DEFAULT L"font_default_8x16.bmp"
 
 EXTERN_OPEN /* extern "C" { */
 
@@ -90,6 +90,7 @@ struct GameState {
   
   /* NOTE: TEMPORARY - Test level data */
   GameBitmapFont bmp_font_default;
+  GameColor color_default_text;
   /* --- */
   
   GameColor background_color;

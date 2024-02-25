@@ -297,30 +297,216 @@ INTERNAL void renderer_texture(GameBackBuffer *back_buffer, Texture texture, F32
 }
 
 
-INTERNAL void renderer_text(GameBackBuffer *back_buffer, GameBitmapFont *bmp_font, F32 x, F32 y, U16 *text) {
+INTERNAL S32 bitmap_font_get_character_offset(U16 c, S32 glyph_width) {
+  S32 offset, unknown_char_offset, lowercase_alphabet_start_offset, uppercase_alphabet_start_offset, numbers_start_offset, symbols_start_offset;
+  
+  unknown_char_offset = 1; /* past the 'unknown' character */
+  lowercase_alphabet_start_offset = unknown_char_offset;
+  uppercase_alphabet_start_offset = unknown_char_offset + 26;
+  numbers_start_offset = uppercase_alphabet_start_offset + 26;
+  symbols_start_offset = numbers_start_offset + 10;
+  if (c >= 'a' && c <= 'z') {
+    offset = (c - 'a') + lowercase_alphabet_start_offset;
+  } else if (c >= 'A' && c <= 'Z') {
+    offset = (c - 'A') + uppercase_alphabet_start_offset;
+  } else if (c >= '0' && c <= '9') {
+    offset = (c - '0') + numbers_start_offset;
+  } else {
+    offset = symbols_start_offset;
+    switch (c) {
+      case ' ': {
+        offset += 64;
+      } break;
+      
+      case '-': {
+        offset += 0;
+      } break;
+      
+      case '=': {
+        offset += 1;
+      } break;
+      
+      case '(': {
+        offset += 2;
+      } break;
+      case ')': {
+        offset += 3;
+      } break;
+      
+      case '{': {
+        offset += 4;
+      } break;
+      case '}': {
+        offset += 5;
+      } break;
+      
+      case '[': {
+        offset += 6;
+      } break;
+      case ']': {
+        offset += 7;
+      } break;
+      
+      /*
+      case '´': {
+        offset = 8;
+      } break;
+*/
+      
+      case '~': {
+        offset += 9;
+      } break;
+      
+      case '<': {
+        offset += 10;
+      } break;
+      case '>': {
+        offset += 11;
+      } break;
+      
+      case '/': {
+        offset += 12;
+      } break;
+      
+      case '?': {
+        offset += 13;
+      } break;
+      
+      case '.': {
+        offset += 14;
+      } break;
+      
+      case ',': {
+        offset += 15;
+      } break;
+      
+      case '\'': {
+        offset += 16;
+      } break;
+      case '"': {
+        offset += 17;
+      } break;
+      
+      case '!': {
+        offset += 18;
+      } break;
+      
+      case '@': {
+        offset += 19;
+      } break;
+      
+      case '#': {
+        offset += 20;
+      } break;
+      
+      case '$': {
+        offset += 21;
+      } break;
+      
+      case '%': {
+        offset += 22;
+      } break;
+      
+      /*
+      case '¨': {
+        offset += 23;
+      } break;
+*/
+      
+      case '&': {
+        offset += 24;
+      } break;
+      
+      case '*': {
+        offset += 25;
+      } break;
+      
+      case '|': {
+        offset += 26;
+      } break;
+      
+      case '\\': {
+        offset += 27;
+      } break;
+      
+      /*
+...
+      çÇàèìòùáéíóúÀÈÌÒÙÁÉÍÓÚãõÃÕâêôÂÊÔ
+...
+*/
+      
+      /*
+      case '`': {
+        offset += 60;
+      } break;
+*/
+      
+      case ':': {
+        offset += 61;
+      } break;
+      
+      case ';': {
+        offset += 62;
+      } break;
+      
+      case '_': {
+        offset += 63;
+      } break;
+      
+      default: {
+        offset = 0;
+      }
+    }
+  }
+  
+  return (glyph_width * offset);
+}
+
+INTERNAL void renderer_text(GameBackBuffer *back_buffer, GameBitmapFont *bmp_font, GameColor color, F32 x, F32 y, U16 *text) {
   S32 back_buffer_xpos, back_buffer_ypos;
   S32 texture_xpos, texture_ypos;
   U32 *back_buffer_pixel, *texture_pixel;
+  F32 r, g, b, a, dest_r, dest_g, dest_b;
+  U16 c;
   S32 i, j;
   
   back_buffer_xpos = round_f32_to_s32(x);
   back_buffer_ypos = round_f32_to_s32(y);
   /* 'text' must be null terminated - just for now, later I'll write a string library */
-  while(*text++) {
-    /* ... */
-    texture_xpos = 0;
+  while(c = *text++) {
+    /* calculate character offset based on the bitmap font */
     texture_ypos = 0;
+    texture_xpos = bitmap_font_get_character_offset(c, bmp_font->glyph_width);
     
     if ( (back_buffer_xpos + bmp_font->glyph_width < back_buffer->width) && (back_buffer_ypos + bmp_font->glyph_height < back_buffer->height) ) {
       for (i = 0; i < bmp_font->glyph_height; ++i) {
         back_buffer_pixel = CAST(U32 *)back_buffer->memory + ( (back_buffer_ypos + i) * back_buffer->width) + back_buffer_xpos;
-        texture_pixel = CAST(U32 *)bmp_font->bmp.data + ((bmp_font->bmp.width * bmp_font->bmp.height) - bmp_font->bmp.width * (i + 1) + texture_xpos); /* 0,0 is the 'unkown' char */
+        texture_pixel = CAST(U32 *)bmp_font->bmp.data + ((bmp_font->bmp.width * bmp_font->bmp.height) - bmp_font->bmp.width * (i + 1) + texture_xpos); /* 0,0 is the 'unknown' char - y top-left */
         for (j = 0; j < bmp_font->glyph_width; ++j) {
-          *back_buffer_pixel = *texture_pixel;
+          r = (*texture_pixel >> 16 & 0xFF) / 255.0f;
+          g = (*texture_pixel >> 8 & 0xFF) / 255.0f;
+          b = (*texture_pixel >> 0 & 0xFF) / 255.0f;
+          a = (*texture_pixel >> 24 & 0xFF) / 255.0f;
+          
+          if (r == 1.0f && g == 0.0f && b == 1.0f) { /* default debug pink */
+            r = color.r;
+            g = color.g;
+            b = color.b;
+          }
+          
+          dest_r = (*back_buffer_pixel >> 16 & 0xFF) / 255.0f;
+          dest_g = (*back_buffer_pixel >> 8 & 0xFF) / 255.0f;
+          dest_b = (*back_buffer_pixel >> 0 & 0xFF) / 255.0f;
+          
+          r = (1.0f - a)*dest_r + a*r;
+          g = (1.0f - a)*dest_g + a*g;
+          b = (1.0f - a)*dest_b + a*b;
+          *back_buffer_pixel = (round_f32_to_u32(r * 255.0f) << 16 | round_f32_to_u32(g * 255.0f) << 8 | round_f32_to_u32(b * 255.0f) << 0 | round_f32_to_u32(a * 255.0f) << 24);
           texture_pixel++;
           back_buffer_pixel++;
         }
       }
+      back_buffer_xpos += bmp_font->glyph_width;
     }
   }
 }

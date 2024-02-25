@@ -270,6 +270,8 @@ INTERNAL void level_test(GameBackBuffer *back_buffer, GameInput *input, GameMemo
     state->game_level.is_initialized = TRUE;
     state->game_level.is_running = TRUE;
     state->game_level.time_elapsed = 0.0f;
+    
+    state->color_default_text = color_create_from_hex(0xF6F6F6FF);
   }
   
   /* Test level: update */
@@ -278,9 +280,12 @@ INTERNAL void level_test(GameBackBuffer *back_buffer, GameInput *input, GameMemo
   
   /* Test level: render */
   {
+    
     renderer_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, state->background_color);
     
-    renderer_text(back_buffer, &state->bmp_font_default, back_buffer->width/2.0f, back_buffer->height/2.0f, L"H");
+    renderer_text(back_buffer, &state->bmp_font_default, state->color_default_text, 10, back_buffer->height/2.0f, L"a b c d e f g h i j k l m n o p q r s t u v w x y z ");
+    renderer_text(back_buffer, &state->bmp_font_default, state->color_default_text, 10, back_buffer->height/2.0f+20, L"A B C D E F G H I J K L M N O P Q R S T U V W X Y Z");
+    renderer_text(back_buffer, &state->bmp_font_default, state->color_default_text, 10, back_buffer->height/2.0f+40, L"- = ( ) { } [ ] ~ < > / ? . , ' \" ! @ # $ % & * | \\ * / ");
   }
 }
 
