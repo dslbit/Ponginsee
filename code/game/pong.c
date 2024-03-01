@@ -1,5 +1,6 @@
 /*
 -* TODO LIST:
+-*  |_-> Debug simplified console (with support for integers & floating-point numbers)
 -*  |_-> Texture rendering with ( ) rotation and (X) relative coordinate system (UV) for scaled bitmaps
 -*
 -*  |_-> Make a rect bound (in-game) of the screen to shake it when players hit the ball (juice)
@@ -21,9 +22,7 @@
 -*
 -*  |_-> On/Off features (particles, bounce effects, ddp effects, etc.)
 -*   |_> Also display that in the F3 (debug) state of the engine/game.
--*  |_-> Figure out text rendering using () Bitmaps & () TrueType
--*   |_-> Show debug info in-game
--*  |_-> Debug simplified console (with support for integers & floating-point numbers)
+-*  |_-> Figure out text rendering using (X) Bitmaps & () TrueType
 -*  |_-> Figure out the sound engine
 -*  |_-> Platform-independent: sound output
 -*
@@ -45,6 +44,9 @@
 #include "pong_platform.h"
 #include "pong_renderer.h"
 
+/* IMPORTANT: Temporary; Replace! */
+#include "stdio.h" /* used for snprintf() */
+
 /* NOTE: What if other levels have the same movement code? */
 INTERNAL void level_null(GameBackBuffer *back_buffer, GameInput *input, GameMemory *memory);
 INTERNAL void level_test(GameBackBuffer *back_buffer, GameInput *input, GameMemory *memory);
@@ -63,6 +65,7 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
     state->bmp_font_default.glyph_width = 8;
     state->bmp_font_default.glyph_height = 16;
     state->bmp_font_default.bmp = load_bitmap(memory, GAME_DEFAULT_DATA_RELATIVE_PATH GAME_BMP_FONT_DEFAULT);
+    state->color_default_text = color_create_from_hex(0xefd081ff);
     
     state->game_debug_state.is_on = FALSE;
     state->game_debug_state.dt = 0.033333f;
@@ -118,8 +121,12 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
     
     /* set debug state if it's on */
     if (state->game_debug_state.is_on) {
+      debug->dt_original = input->dt;
       input->dt = debug->dt;
     }
+    
+    /* update accumulated_dt */
+    state->game_debug_state.accumulated_dt += debug->dt_original;
   }
   
   /* NOTE: Primitve level selection & pause action */
@@ -230,6 +237,39 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
         renderer_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height-border_size/2.0f, CAST(F32) back_buffer->width - border_size*2, border_size, color_create_from_rgba(178, 39, 65, 160)); /* top border */
       }
       
+      {
+        /* Debug Info (text) */
+        F32 text_x, text_y, text_yspacing;
+        S8 text_buffer[1024] = {0};
+        
+        text_x = 0.0f + state->bmp_font_default.glyph_width/2.0f;
+        text_y = 0.0f + state->bmp_font_default.glyph_height;
+        text_yspacing = state->bmp_font_default.glyph_height + state->bmp_font_default.glyph_height/6.0f;
+        
+        /* NOTE: @Replace snprintf() */
+        snprintf(text_buffer, ARRAY_COUNT(text_buffer), "MS (original): %f", state->game_debug_state.dt_original*1000);
+        renderer_text(back_buffer, &state->bmp_font_default, state->color_default_text, text_x, text_y, text_buffer);
+        text_y += text_yspacing;
+        
+        snprintf(text_buffer, ARRAY_COUNT(text_buffer), "MS (imposed): %f", state->game_debug_state.dt*1000);
+        renderer_text(back_buffer, &state->bmp_font_default, state->color_default_text, text_x, text_y, text_buffer);
+        text_y += text_yspacing;
+        
+        snprintf(text_buffer, ARRAY_COUNT(text_buffer), "Accumulated dt: %f", state->game_debug_state.accumulated_dt);
+        renderer_text(back_buffer, &state->bmp_font_default, state->color_default_text, text_x, text_y, text_buffer);
+        text_y += text_yspacing;
+        
+        snprintf(text_buffer, ARRAY_COUNT(text_buffer), "Double Buffer: %i x %i", back_buffer->width, back_buffer->height);
+        renderer_text(back_buffer, &state->bmp_font_default, state->color_default_text, text_x, text_y, text_buffer);
+        text_y += text_yspacing;
+        
+        snprintf(text_buffer, ARRAY_COUNT(text_buffer), "Game Memory: %lliKB", memory->current_size/1024);
+        renderer_text(back_buffer, &state->bmp_font_default, state->color_default_text, text_x, text_y, text_buffer);
+        text_y += text_yspacing;
+        
+        /* TODO: Level states on/off: particles (& amount), trails (& amount), ddp effects?, etc. */
+      }
+      
     }
     
     
@@ -283,9 +323,11 @@ INTERNAL void level_test(GameBackBuffer *back_buffer, GameInput *input, GameMemo
     
     renderer_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, state->background_color);
     
+#if 0
     renderer_text(back_buffer, &state->bmp_font_default, state->color_default_text, 10, back_buffer->height/2.0f, L"a b c d e f g h i j k l m n o p q r s t u v w x y z ");
     renderer_text(back_buffer, &state->bmp_font_default, state->color_default_text, 10, back_buffer->height/2.0f+20, L"A B C D E F G H I J K L M N O P Q R S T U V W X Y Z");
     renderer_text(back_buffer, &state->bmp_font_default, state->color_default_text, 10, back_buffer->height/2.0f+40, L"- = ( ) { } [ ] ~ < > / ? . , ' \" ! @ # $ % & * | \\ * / ");
+#endif
   }
 }
 

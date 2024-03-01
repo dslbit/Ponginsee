@@ -296,7 +296,7 @@ INTERNAL void renderer_texture(GameBackBuffer *back_buffer, Texture texture, F32
   }
 }
 
-
+/* TODO: Lookup table */
 INTERNAL S32 bitmap_font_get_character_offset(U16 c, S32 glyph_width) {
   S32 offset, unknown_char_offset, lowercase_alphabet_start_offset, uppercase_alphabet_start_offset, numbers_start_offset, symbols_start_offset;
   
@@ -462,12 +462,12 @@ INTERNAL S32 bitmap_font_get_character_offset(U16 c, S32 glyph_width) {
   return (glyph_width * offset);
 }
 
-INTERNAL void renderer_text(GameBackBuffer *back_buffer, GameBitmapFont *bmp_font, GameColor color, F32 x, F32 y, U16 *text) {
+INTERNAL void renderer_text(GameBackBuffer *back_buffer, GameBitmapFont *bmp_font, GameColor color, F32 x, F32 y, S8 *text) {
   S32 back_buffer_xpos, back_buffer_ypos;
   S32 texture_xpos, texture_ypos;
   U32 *back_buffer_pixel, *texture_pixel;
   F32 r, g, b, a, dest_r, dest_g, dest_b;
-  U16 c;
+  S32 c;
   S32 i, j;
   
   back_buffer_xpos = round_f32_to_s32(x);

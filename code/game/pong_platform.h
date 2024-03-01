@@ -71,6 +71,7 @@ typedef struct GameDebugState GameDebugState;
 struct GameDebugState {
   B32 is_on;
   F32 dt;
+  F32 dt_original;
   F32 accumulated_dt;
 };
 
