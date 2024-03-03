@@ -72,7 +72,13 @@ struct GameDebugState {
   B32 is_on;
   F32 dt;
   F32 dt_original;
-  F32 accumulated_dt;
+  B32 is_particles_on;
+  U32 count_particles;
+  B32 is_trails_on;
+  U32 count_trails;
+  B32 is_ddp_effects_on;
+  U32 count_ddp_effects_per_entity;
+  F64 accumulated_dt;
 };
 
 typedef struct GameState GameState;
@@ -91,7 +97,9 @@ struct GameState {
   
   /* NOTE: TEMPORARY - Test level data */
   GameBitmapFont bmp_font_default;
-  GameColor color_default_text;
+  GameColor text_default_color;
+  GameColor text_color_red;
+  GameColor text_color_green;
   /* --- */
   
   GameColor background_color;

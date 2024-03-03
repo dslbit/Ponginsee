@@ -2,6 +2,7 @@
 -* TODO LIST:
 -*  |_-> Debug simplified console (with support for integers & floating-point numbers)
 -*  |_-> Texture rendering with ( ) rotation and (X) relative coordinate system (UV) for scaled bitmaps
+-*  |_-> Memory bug - maybe I'm pushing more than necessary when resetting a level (is it the particles?)
 -*
 -*  |_-> Make a rect bound (in-game) of the screen to shake it when players hit the ball (juice)
 -*  |_-> +1 effect for points when player hit the ball (juice)
@@ -20,8 +21,6 @@
 -*  |_-> Save progress? - IDK how crazy this will get, so do it only if it's
 -*  needed
 -*
--*  |_-> On/Off features (particles, bounce effects, ddp effects, etc.)
--*   |_> Also display that in the F3 (debug) state of the engine/game.
 -*  |_-> Figure out text rendering using (X) Bitmaps & () TrueType
 -*  |_-> Figure out the sound engine
 -*  |_-> Platform-independent: sound output
@@ -65,10 +64,15 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
     state->bmp_font_default.glyph_width = 8;
     state->bmp_font_default.glyph_height = 16;
     state->bmp_font_default.bmp = load_bitmap(memory, GAME_DEFAULT_DATA_RELATIVE_PATH GAME_BMP_FONT_DEFAULT);
-    state->color_default_text = color_create_from_hex(0xefd081ff);
+    state->text_default_color = color_create_from_hex(0xefd081ff);
+    state->text_color_green = color_create_from_hex(0x3ec54bff);
+    state->text_color_red = color_create_from_hex(0xf5464cff);
     
     state->game_debug_state.is_on = FALSE;
-    state->game_debug_state.dt = 0.033333f;
+    state->game_debug_state.dt = 0.016666f;
+    state->game_debug_state.is_particles_on = TRUE;
+    state->game_debug_state.is_trails_on = TRUE;
+    state->game_debug_state.is_ddp_effects_on = TRUE;
     state->background_color = color_create_from_hex(0x1f1723ff);
     state->background_color_paused = color_create_from_hex(0xefd08180);
     /* NOTE: Maybe this should be moved to the level update function
@@ -105,28 +109,33 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
     debug = &state->game_debug_state;
     /* debug mode toggle */
     if (input->player1.f3.released) {
-      state->game_debug_state.is_on = !state->game_debug_state.is_on;
+      debug->is_on = !debug->is_on;
     }
     
     /* dt change*/
-    if (input->player1.minus.released) {
-      debug->dt += 0.0023334f;
-    }
-    if (input->player1.plus.released) {
-      debug->dt -= 0.0023334f;
-      if (debug->dt < 0) {
-        debug->dt = 0;
+    if (debug->is_on) {
+      if (input->player1.minus.released) {
+        debug->dt += 0.0023334f;
+      }
+      if (input->player1.plus.released) {
+        debug->dt -= 0.0023334f;
+        if (debug->dt < 0) {
+          debug->dt = 0;
+        }
       }
     }
     
     /* set debug state if it's on */
-    if (state->game_debug_state.is_on) {
-      debug->dt_original = input->dt;
+    debug->dt_original = input->dt;
+    if (debug->is_on) {
       input->dt = debug->dt;
     }
     
     /* update accumulated_dt */
-    state->game_debug_state.accumulated_dt += debug->dt_original;
+    debug->accumulated_dt += debug->dt_original;
+    if (debug->accumulated_dt < 0) {
+      debug->accumulated_dt = 0; /* account for almost impossible overflow */
+    }
   }
   
   /* NOTE: Primitve level selection & pause action */
@@ -216,6 +225,8 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
     }
   }
   
+  /* TODO: Engine console - To every system created, output something to the engine console */
+  
   /* NOTE: Engine debug mode drawing over */
   {
     GameDebugState *debug;
@@ -223,7 +234,7 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
     debug = &state->game_debug_state;
     if (debug->is_on) {
       
-      /* debug rect indication */
+      /* debug rect indication (the red border around the screen) */
       {
         F32 border_size;
         
@@ -235,6 +246,8 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
         renderer_filled_rect(back_buffer, back_buffer->width/2.0f, border_size/2.0f, CAST(F32) back_buffer->width - border_size*2, border_size, color_create_from_rgba(178, 39, 65, 160)); /* top border */
         
         renderer_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height-border_size/2.0f, CAST(F32) back_buffer->width - border_size*2, border_size, color_create_from_rgba(178, 39, 65, 160)); /* top border */
+        
+        /* TODO: Draw collision bounds */
       }
       
       {
@@ -248,26 +261,82 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
         
         /* NOTE: @Replace snprintf() */
         snprintf(text_buffer, ARRAY_COUNT(text_buffer), "MS (original): %f", state->game_debug_state.dt_original*1000);
-        renderer_text(back_buffer, &state->bmp_font_default, state->color_default_text, text_x, text_y, text_buffer);
+        renderer_text(back_buffer, &state->bmp_font_default, state->text_default_color, text_x, text_y, text_buffer);
         text_y += text_yspacing;
         
         snprintf(text_buffer, ARRAY_COUNT(text_buffer), "MS (imposed): %f", state->game_debug_state.dt*1000);
-        renderer_text(back_buffer, &state->bmp_font_default, state->color_default_text, text_x, text_y, text_buffer);
+        renderer_text(back_buffer, &state->bmp_font_default, state->text_default_color, text_x, text_y, text_buffer);
         text_y += text_yspacing;
         
         snprintf(text_buffer, ARRAY_COUNT(text_buffer), "Accumulated dt: %f", state->game_debug_state.accumulated_dt);
-        renderer_text(back_buffer, &state->bmp_font_default, state->color_default_text, text_x, text_y, text_buffer);
+        renderer_text(back_buffer, &state->bmp_font_default, state->text_default_color, text_x, text_y, text_buffer);
         text_y += text_yspacing;
         
         snprintf(text_buffer, ARRAY_COUNT(text_buffer), "Double Buffer: %i x %i", back_buffer->width, back_buffer->height);
-        renderer_text(back_buffer, &state->bmp_font_default, state->color_default_text, text_x, text_y, text_buffer);
+        renderer_text(back_buffer, &state->bmp_font_default, state->text_default_color, text_x, text_y, text_buffer);
         text_y += text_yspacing;
         
+        /* Text: 'Game Memory: ...' */
         snprintf(text_buffer, ARRAY_COUNT(text_buffer), "Game Memory: %lliKB", memory->current_size/1024);
-        renderer_text(back_buffer, &state->bmp_font_default, state->color_default_text, text_x, text_y, text_buffer);
+        renderer_text(back_buffer, &state->bmp_font_default, state->text_default_color, text_x, text_y, text_buffer);
         text_y += text_yspacing;
         
-        /* TODO: Level states on/off: particles (& amount), trails (& amount), ddp effects?, etc. */
+        /* Maybe do a count for particles/trails/ddps etc. - it almost ready, just need to draw now */
+        
+        /* Text: 'Particles: ON/OFF' */
+        text_x += state->bmp_font_default.glyph_width * 40; /* 40 chars */
+        text_y = 0.0f + state->bmp_font_default.glyph_height;
+        
+        if (state->game_debug_state.is_particles_on) {
+          snprintf(text_buffer, ARRAY_COUNT(text_buffer), "Particles: ");
+          renderer_text(back_buffer, &state->bmp_font_default, state->text_default_color, text_x, text_y, text_buffer);
+          
+          snprintf(text_buffer, ARRAY_COUNT(text_buffer), "ON");
+          renderer_text(back_buffer, &state->bmp_font_default, state->text_color_green, text_x + ((ARRAY_COUNT("Particles: ") - 1) * state->bmp_font_default.glyph_width), text_y, text_buffer);
+          
+          snprintf(text_buffer, ARRAY_COUNT(text_buffer), " - %d", state->game_debug_state.count_particles);
+          renderer_text(back_buffer, &state->bmp_font_default, state->text_default_color, text_x + ((ARRAY_COUNT("Particles: ON") - 1) * state->bmp_font_default.glyph_width), text_y, text_buffer);
+        } else {
+          snprintf(text_buffer, ARRAY_COUNT(text_buffer), "OFF");
+          renderer_text(back_buffer, &state->bmp_font_default, state->text_color_red, text_x + ((ARRAY_COUNT("Particles: ") - 1) * state->bmp_font_default.glyph_width), text_y, text_buffer);
+        }
+        text_y += text_yspacing;
+        
+        /* Text: 'Trails: ON/OFF' */
+        if (state->game_debug_state.is_trails_on) {
+          snprintf(text_buffer, ARRAY_COUNT(text_buffer), "Trails: ");
+          renderer_text(back_buffer, &state->bmp_font_default, state->text_default_color, text_x, text_y, text_buffer);
+          
+          snprintf(text_buffer, ARRAY_COUNT(text_buffer), "ON");
+          renderer_text(back_buffer, &state->bmp_font_default, state->text_color_green, text_x + ((ARRAY_COUNT("Trails: ") - 1) * state->bmp_font_default.glyph_width), text_y, text_buffer);
+          
+          snprintf(text_buffer, ARRAY_COUNT(text_buffer), " - %d", state->game_debug_state.count_trails);
+          renderer_text(back_buffer, &state->bmp_font_default, state->text_default_color, text_x + ((ARRAY_COUNT("TRAILS: ON") - 1) * state->bmp_font_default.glyph_width), text_y, text_buffer);
+        } else {
+          snprintf(text_buffer, ARRAY_COUNT(text_buffer), "Trails: ");
+          renderer_text(back_buffer, &state->bmp_font_default, state->text_default_color, text_x, text_y, text_buffer);
+          snprintf(text_buffer, ARRAY_COUNT(text_buffer), "OFF");
+          renderer_text(back_buffer, &state->bmp_font_default, state->text_color_red, text_x + ((ARRAY_COUNT("Trails: ") - 1) * state->bmp_font_default.glyph_width), text_y, text_buffer);
+        }
+        text_y += text_yspacing;
+        
+        /* Text: 'DDP Effects: ON/OFF' */
+        if (state->game_debug_state.is_trails_on) {
+          snprintf(text_buffer, ARRAY_COUNT(text_buffer), "DDP Effects: ");
+          renderer_text(back_buffer, &state->bmp_font_default, state->text_default_color, text_x, text_y, text_buffer);
+          
+          snprintf(text_buffer, ARRAY_COUNT(text_buffer), "ON");
+          renderer_text(back_buffer, &state->bmp_font_default, state->text_color_green, text_x + ((ARRAY_COUNT("DDP Effects: ") - 1) * state->bmp_font_default.glyph_width), text_y, text_buffer);
+          
+          snprintf(text_buffer, ARRAY_COUNT(text_buffer), " - %d", state->game_debug_state.count_ddp_effects_per_entity);
+          renderer_text(back_buffer, &state->bmp_font_default, state->text_default_color, text_x + ((ARRAY_COUNT("DDP Effects: ON") - 1) * state->bmp_font_default.glyph_width), text_y, text_buffer);
+        } else {
+          snprintf(text_buffer, ARRAY_COUNT(text_buffer), "DDP Effects: ");
+          renderer_text(back_buffer, &state->bmp_font_default, state->text_default_color, text_x, text_y, text_buffer);
+          snprintf(text_buffer, ARRAY_COUNT(text_buffer), "OFF");
+          renderer_text(back_buffer, &state->bmp_font_default, state->text_color_red, text_x + ((ARRAY_COUNT("DDP Effects: ") - 1) * state->bmp_font_default.glyph_width), text_y, text_buffer);
+        }
+        text_y += text_yspacing;
       }
       
     }
@@ -311,7 +380,7 @@ INTERNAL void level_test(GameBackBuffer *back_buffer, GameInput *input, GameMemo
     state->game_level.is_running = TRUE;
     state->game_level.time_elapsed = 0.0f;
     
-    state->color_default_text = color_create_from_hex(0xF6F6F6FF);
+    state->text_default_color = color_create_from_hex(0xF6F6F6FF);
   }
   
   /* Test level: update */
@@ -342,6 +411,10 @@ INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameM
   /* Classic level: setup */
   if (!state->game_level.is_initialized) {
     S32 i;
+    
+    state->game_debug_state.count_particles = 0;
+    state->game_debug_state.count_trails = 0;
+    state->game_debug_state.count_ddp_effects_per_entity = 0;
     
     state->game_level.is_initialized = TRUE;
     state->game_level.is_running = TRUE;
@@ -374,6 +447,7 @@ INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameM
       state->ball.vel = v2_create(vel_x, vel_y); /* TODO: Check angle between ball and player/opponent, it cannot be too close to 90deg */
     }
     
+    state->game_debug_state.count_trails += ARRAY_COUNT(state->ball.ball_data.trails);
     for (i = 0; i < ARRAY_COUNT(state->ball.ball_data.trails); ++i) {
       Trail *trail;
       
@@ -382,12 +456,15 @@ INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameM
       trail->life = 0.0f;
     }
     state->ball.ball_data.particle_system = particle_system_create(memory, FALSE, state->ball.pos, FALSE, 0, 32, 2, 2, state->ball.color);
+    state->game_debug_state.count_particles += state->ball.ball_data.particle_system.particles_count;
   }
   
   /* Classic level: update and render */
   if (state->game_level.is_running) { /* level is running */
     /* Clearing some data */
-    {}
+    {
+      state->game_debug_state.count_ddp_effects_per_entity = 0;
+    }
     
     /* Player movement code */
     {
@@ -404,8 +481,11 @@ INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameM
       player->vel = v2_add(player->vel, v2_mul(player->vel, -0.15f));
       player->pos = v2_add(player->pos, v2_mul(player->vel, input->dt));
       
-      player->width = 12 - ABS(player->vel.y * 0.00159f);
-      player->height = 70 + ABS(player->vel.y * 0.05f);
+      if (state->game_debug_state.is_ddp_effects_on) {
+        player->width = 12 - ABS(player->vel.y * 0.00159f);
+        player->height = 70 + ABS(player->vel.y * 0.05f);
+        state->game_debug_state.count_ddp_effects_per_entity += 1; /* TODO: Automation */
+      }
     }
     
     /* Opponent movement code */
@@ -466,39 +546,44 @@ INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameM
       ball->pos = v2_add(ball->pos, v2_mul(ball->vel, input->dt));
       /* NOTE: Update ball trails position */
       {
-        U64 trails_count;
-        Trail *trail;
-        S32 i;
         
-        trails_count = ARRAY_COUNT(ball->ball_data.trails);
-        ball->ball_data.timer_trail_spawner -= input->dt;
-        if (ball->ball_data.timer_trail_spawner < 0) {
-          ball->ball_data.timer_trail_spawner = 0.000016f;
-          if (ball->ball_data.trails_next >= trails_count) {
-            ball->ball_data.trails_next = 0;
+        if (state->game_debug_state.is_trails_on) {
+          U64 trails_count;
+          Trail *trail;
+          S32 i;
+          
+          trails_count = ARRAY_COUNT(ball->ball_data.trails);
+          ball->ball_data.timer_trail_spawner -= input->dt;
+          if (ball->ball_data.timer_trail_spawner < 0) {
+            ball->ball_data.timer_trail_spawner = 0.000016f;
+            if (ball->ball_data.trails_next >= trails_count) {
+              ball->ball_data.trails_next = 0;
+            }
+            trail = &ball->ball_data.trails[ball->ball_data.trails_next];
+            trail->pos = ball->pos;
+            trail->angle = v2_angle(ball->vel);
+            trail->life = 0.25f * 10.0f;
+            ball->ball_data.trails_next++;
           }
-          trail = &ball->ball_data.trails[ball->ball_data.trails_next];
-          trail->pos = ball->pos;
-          trail->angle = v2_angle(ball->vel);
-          trail->life = 0.25f * 10.0f;
-          ball->ball_data.trails_next++;
+          for (i = 0; i < trails_count; ++i) {
+            trail = &ball->ball_data.trails[i];
+            trail->life -= input->dt*10.0f;
+            if (trail->life < 0) trail->life = 0;
+          }
         }
-        for (i = 0; i < trails_count; ++i) {
-          trail = &ball->ball_data.trails[i];
-          trail->life -= input->dt*10.0f;
-          if (trail->life < 0) trail->life = 0;
-        }
+        
       }
       
       /* Update ball size multiplier */
-      ball->ball_data.size_multiplier -= input->dt * 2;
-      ball->ball_data.size_multiplier = CLAMP(ball->ball_data.size_multiplier, 1.0f, 10.0f);
+      if (state->game_debug_state.is_ddp_effects_on) {
+        ball->ball_data.size_multiplier -= input->dt * 2;
+        ball->ball_data.size_multiplier = CLAMP(ball->ball_data.size_multiplier, 1.0f, 10.0f);
+        state->game_debug_state.count_ddp_effects_per_entity += 1; /* TODO: Automation */
+      }
     }
     
     /* Axis-aligned Collision - @IMPORTANT: make sure it's above the 'clear_background' */
     {
-      /* @IDEIA: hit particles effects? */
-      
       /* Player VS Arena collision & resolution  */
       {
         S32 player_top, player_bottom;
@@ -544,7 +629,9 @@ INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameM
           ball->pos.y = ball->height/2.0f;
           ball->vel.y *= -1;
           ball->ball_data.particle_system.is_ready_for_emission = TRUE;
-          state->ball.ball_data.size_multiplier = BALL_DEFAULT_SIZE_MULTIPLYER;
+          if (state->game_debug_state.is_ddp_effects_on) {
+            state->ball.ball_data.size_multiplier = BALL_DEFAULT_SIZE_MULTIPLYER;
+          }
         }
         
         ball_hit_point_bottom = CAST(S32) (ball->pos.y + ball->height/2.0f);
@@ -552,7 +639,9 @@ INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameM
           ball->pos.y = level_bounding_rect_height - ball->height/2.0f;
           ball->vel.y *= -1;
           ball->ball_data.particle_system.is_ready_for_emission = TRUE;
-          state->ball.ball_data.size_multiplier = BALL_DEFAULT_SIZE_MULTIPLYER;
+          if (state->game_debug_state.is_ddp_effects_on) {
+            state->ball.ball_data.size_multiplier = BALL_DEFAULT_SIZE_MULTIPLYER;
+          }
         }
         
         ball_hit_point_left = CAST(S32) (ball->pos.x - ball->width/2.0f);
@@ -600,7 +689,9 @@ the arena */
           ball->vel = v2_add(ball->vel, v2_mul(ball->vel, ABS(player->vel.y) * 0.0009f));
           ball->vel.x *= -1;
           ball->ball_data.particle_system.is_ready_for_emission = TRUE;
-          state->ball.ball_data.size_multiplier = BALL_DEFAULT_SIZE_MULTIPLYER;
+          if (state->game_debug_state.is_ddp_effects_on) {
+            state->ball.ball_data.size_multiplier = BALL_DEFAULT_SIZE_MULTIPLYER;
+          }
         }
       }
       
@@ -629,15 +720,19 @@ the arena */
           ball->vel = v2_add(ball->vel, v2_mul(ball->vel, ABS(opponent->vel.y) * 0.0009f));
           ball->vel.x *= -1;
           ball->ball_data.particle_system.is_ready_for_emission = TRUE;
-          state->ball.ball_data.size_multiplier = BALL_DEFAULT_SIZE_MULTIPLYER;
+          if (state->game_debug_state.is_ddp_effects_on) {
+            state->ball.ball_data.size_multiplier = BALL_DEFAULT_SIZE_MULTIPLYER;
+          }
         }
       }
     }
     
     /* @Test -  particles update after collision */
     {
-      state->ball.ball_data.particle_system.pos = state->ball.pos;
-      particle_system_update(&state->ball.ball_data.particle_system, input->dt);
+      if (state->game_debug_state.is_particles_on) {
+        state->ball.ball_data.particle_system.pos = state->ball.pos;
+        particle_system_update(&state->ball.ball_data.particle_system, input->dt);
+      }
     }
     
     /* Re-imagining player score / score progress - Using the arena middle line as a 'load bar' to next levels */
@@ -682,21 +777,26 @@ the arena */
       
       /* Ball particle hit */
       {
-        renderer_debug_particles(back_buffer, &state->ball.ball_data.particle_system);
+        if (state->game_debug_state.is_particles_on) {
+          renderer_debug_particles(back_buffer, &state->ball.ball_data.particle_system);
+        }
       }
       
       /* 'Not so ugly' Ball trail (rect) representation - @IDEIA: change color if it's FAST */
       {
-        S32 i;
-        GameColor color_trail;
-        Trail *trail;
         
-        for (i = 0; i < ARRAY_COUNT(state->ball.ball_data.trails); ++i) {
-          trail = &state->ball.ball_data.trails[i];
-          if (trail->life > 0) {
-            color_trail = state->ball.color;
-            color_trail.a = (trail->life / 20.0f);
-            renderer_filled_rotated_rect(back_buffer, trail->pos.x, trail->pos.y, state->ball.width, state->ball.height, rad_to_deg(trail->angle), color_trail);
+        if (state->game_debug_state.is_trails_on) {
+          S32 i;
+          GameColor color_trail;
+          Trail *trail;
+          
+          for (i = 0; i < ARRAY_COUNT(state->ball.ball_data.trails); ++i) {
+            trail = &state->ball.ball_data.trails[i];
+            if (trail->life > 0) {
+              color_trail = state->ball.color;
+              color_trail.a = (trail->life / 20.0f);
+              renderer_filled_rotated_rect(back_buffer, trail->pos.x, trail->pos.y, state->ball.width, state->ball.height, rad_to_deg(trail->angle), color_trail);
+            }
           }
         }
         

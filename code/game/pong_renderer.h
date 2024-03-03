@@ -203,7 +203,7 @@ INTERNAL INLINE void renderer_debug_entity(GameBackBuffer *back_buffer, Entity *
 }
 
 INTERNAL INLINE void renderer_debug_particles(GameBackBuffer *back_buffer, ParticleSystem *ps) {
-  S32 i;
+  U32 i;
   Particle *p;
   
   for (i = 0; i < ps->particles_count; ++i) {

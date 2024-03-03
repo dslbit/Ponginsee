@@ -22,14 +22,14 @@ struct ParticleSystem {
   V2 pos;
   B32 is_looping;
   F32 loop_delay;
-  U64 particles_count;
+  U32 particles_count;
   Particle *particles;
 };
 
 /* NOTE: Change particle color here to texture later? */
-INTERNAL ParticleSystem particle_system_create(GameMemory *memory, B32 is_ready_for_emission, V2 initial_pos, B32 is_looping, F32 loop_delay, U64 particles_count, F32 particles_width, F32 particles_height, GameColor particles_color) {
+INTERNAL ParticleSystem particle_system_create(GameMemory *memory, B32 is_ready_for_emission, V2 initial_pos, B32 is_looping, F32 loop_delay, U32 particles_count, F32 particles_width, F32 particles_height, GameColor particles_color) {
   ParticleSystem ps;
-  S32 i;
+  U32 i;
   
   ps.is_ready_for_emission = is_ready_for_emission;
   ps.pos = initial_pos;
@@ -48,7 +48,7 @@ INTERNAL ParticleSystem particle_system_create(GameMemory *memory, B32 is_ready_
 }
 
 INTERNAL void particle_system_update(ParticleSystem *ps, F32 dt) {
-  S32 i;
+  U32 i;
   Particle *p;
   
 #if 0
