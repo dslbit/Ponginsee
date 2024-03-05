@@ -2,7 +2,7 @@
 -* TODO LIST:
 -*  |_-> Debug simplified console (with support for integers & floating-point numbers)
 -*  |_-> Texture rendering with ( ) rotation and (X) relative coordinate system (UV) for scaled bitmaps
--*  |_-> Memory bug - maybe I'm pushing more than necessary when resetting a level (is it the particles?)
+-*  |_-> Fix memory bug - maybe I'm pushing more than necessary when resetting a level (is it the particles?)
 -*
 -*  |_-> Make a rect bound (in-game) of the screen to shake it when players hit the ball (juice)
 -*  |_-> +1 effect for points when player hit the ball (juice)
@@ -68,6 +68,10 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
     state->text_color_green = color_create_from_hex(0x3ec54bff);
     state->text_color_red = color_create_from_hex(0xf5464cff);
     
+    state->game_console_state.is_on = FALSE;
+    state->game_console_state.color_bg = color_create_from_hex(0x1f17237f);
+    state->game_console_state.color_border = color_create_from_hex(0xc6c6c67f);
+    
     state->game_debug_state.is_on = FALSE;
     state->game_debug_state.dt = 0.016666f;
     state->game_debug_state.is_particles_on = TRUE;
@@ -102,7 +106,7 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
     state->ball.ball_data.size_multiplier = 1;
   }
   
-  /* NOTE: Engine debug mode */
+  /* NOTE: Engine debug mode - Update */
   {
     GameDebugState *debug;
     
@@ -135,6 +139,13 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
     debug->accumulated_dt += debug->dt_original;
     if (debug->accumulated_dt < 0) {
       debug->accumulated_dt = 0; /* account for almost impossible overflow */
+    }
+  }
+  
+  /* Engine console - Updater */
+  {
+    if (input->player1.f9.released) {
+      state->game_console_state.is_on = !state->game_console_state.is_on;
     }
   }
   
@@ -341,7 +352,16 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
       
     }
     
-    
+  }
+  
+  /* Engine console drawing */
+  {
+    if (state->game_console_state.is_on) {
+      /*console_update_and_draw();*/
+      renderer_filled_rect(back_buffer, back_buffer->width/2.0f, (back_buffer->height*0.475f)/2.0f, CAST(F32) back_buffer->width, back_buffer->height*0.475f, state->game_console_state.color_bg);
+      
+      renderer_filled_rect(back_buffer, back_buffer->width/2.0f, (back_buffer->height*0.475f) + 1, CAST(F32) back_buffer->width, 1, state->game_console_state.color_border);
+    }
   }
 }
 

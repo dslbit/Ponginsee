@@ -26,6 +26,7 @@ struct GameControllerInput {
   union {
     GameButtonState buttons[19];
     struct {
+      /* engine/game controls */
       GameButtonState start;
       GameButtonState back; /* also used for menu (escape key / select on controller) */
       GameButtonState up;
@@ -33,10 +34,12 @@ struct GameControllerInput {
       GameButtonState left;
       GameButtonState right;
       
-      GameButtonState f3;
-      GameButtonState plus;
-      GameButtonState minus;
+      GameButtonState f9; /* toggle engine console */
+      GameButtonState f3; /* toggle debug mode */
+      GameButtonState plus; /* debug mode +dt */
+      GameButtonState minus; /* debug mode -dt */
       
+      /* used to quick-swap game levels */
       GameButtonState aux0;
       GameButtonState aux1;
       GameButtonState aux2;
@@ -67,6 +70,14 @@ struct GameBitmapFont {
   Texture bmp;
 };
 
+typedef struct GameConsoleState GameConsoleState;
+struct GameConsoleState {
+  B32 is_on;
+  GameColor color_bg;
+  GameColor color_border;
+  S8 buffer[1024][128];
+};
+
 typedef struct GameDebugState GameDebugState;
 struct GameDebugState {
   B32 is_on;
@@ -87,6 +98,7 @@ struct GameState {
   B32 is_paused;
   B32 is_showing_paused_screen;
   U32 random_seed;
+  GameConsoleState game_console_state;
   GameDebugState game_debug_state;
   GameMemory game_memory;
   GameLevel game_level;
