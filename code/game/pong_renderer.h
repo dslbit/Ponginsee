@@ -472,6 +472,7 @@ INTERNAL void renderer_text(GameBackBuffer *back_buffer, GameBitmapFont *bmp_fon
   
   back_buffer_xpos = round_f32_to_s32(x);
   back_buffer_ypos = round_f32_to_s32(y);
+  if (back_buffer_xpos < 0 || back_buffer_ypos < 0 || back_buffer_xpos > back_buffer->width || back_buffer_ypos > back_buffer->height) { return; }
   /* 'text' must be null terminated - just for now, later I'll write a string library */
   while(c = *text++) {
     /* calculate character offset based on the bitmap font */

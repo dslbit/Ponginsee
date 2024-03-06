@@ -3,6 +3,7 @@
 -*  |_-> Debug simplified console (with support for integers & floating-point numbers)
 -*  |_-> Texture rendering with ( ) rotation and (X) relative coordinate system (UV) for scaled bitmaps
 -*  |_-> Fix memory bug - maybe I'm pushing more than necessary when resetting a level (is it the particles?)
+-*  |_->NOTE: Should I pass the origin to the renderer?
 -*
 -*  |_-> Make a rect bound (in-game) of the screen to shake it when players hit the ball (juice)
 -*  |_-> +1 effect for points when player hit the ball (juice)
@@ -69,8 +70,9 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
     state->text_color_red = color_create_from_hex(0xf5464cff);
     
     state->game_console_state.is_on = FALSE;
-    state->game_console_state.color_bg = color_create_from_hex(0x1f17237f);
+    state->game_console_state.color_bg = color_create_from_hex(0x1f1723be);
     state->game_console_state.color_border = color_create_from_hex(0xc6c6c67f);
+    state->game_console_state.color_text = color_create_from_hex(0xb4e656ff);
     
     state->game_debug_state.is_on = FALSE;
     state->game_debug_state.dt = 0.016666f;
@@ -144,8 +146,24 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
   
   /* Engine console - Updater */
   {
+    GameConsoleState *console;
+    GameDebugState *debug;
+    LOCAL F32 counter; /* NOTE: temp, @cleanup */
+    
+    console = &state->game_console_state;
+    debug = &state->game_debug_state;
     if (input->player1.f9.released) {
-      state->game_console_state.is_on = !state->game_console_state.is_on;
+      console->is_on = !console->is_on;
+    }
+    
+    counter += input->dt;
+    if (counter > 2.0f) {
+      counter = 0.0f;
+      /* push msg to the end of console buffer  */
+      if (console->last_buffer_index != (ARRAY_COUNT(console->buffer) - 1)) {
+        snprintf(console->buffer[console->last_buffer_index], ARRAY_COUNT(console->buffer[console->last_buffer_index]), "%f", debug->accumulated_dt);
+        ++console->last_buffer_index;
+      }
     }
   }
   
@@ -357,10 +375,21 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
   /* Engine console drawing */
   {
     if (state->game_console_state.is_on) {
-      /*console_update_and_draw();*/
-      renderer_filled_rect(back_buffer, back_buffer->width/2.0f, (back_buffer->height*0.475f)/2.0f, CAST(F32) back_buffer->width, back_buffer->height*0.475f, state->game_console_state.color_bg);
+      S32 i, k;
+      GameConsoleState *console;
       
-      renderer_filled_rect(back_buffer, back_buffer->width/2.0f, (back_buffer->height*0.475f) + 1, CAST(F32) back_buffer->width, 1, state->game_console_state.color_border);
+      /*console_update_and_draw();*/
+      console = &state->game_console_state;
+      renderer_filled_rect(back_buffer, back_buffer->width/2.0f, (back_buffer->height*0.475f)/2.0f, CAST(F32) back_buffer->width, back_buffer->height*0.475f, state->game_console_state.color_bg); /* console transparent background */
+      
+      renderer_filled_rect(back_buffer, back_buffer->width/2.0f, (back_buffer->height*0.475f) + 1, CAST(F32) back_buffer->width, 1, state->game_console_state.color_border); /* console bottom border */
+      
+      renderer_text(back_buffer, &state->bmp_font_default, console->color_text, 1, back_buffer->height*0.475f - state->bmp_font_default.glyph_height - 1, ">");
+      k = 0;
+      for (i = console->last_buffer_index; i >= 0; --i) {
+        renderer_text(back_buffer, &state->bmp_font_default, state->game_console_state.color_text, 10, back_buffer->height*0.475f - (k * state->bmp_font_default.glyph_height - 1), state->game_console_state.buffer[i]);
+        ++k;
+      }
     }
   }
 }

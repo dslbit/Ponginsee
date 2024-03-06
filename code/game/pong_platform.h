@@ -75,7 +75,9 @@ struct GameConsoleState {
   B32 is_on;
   GameColor color_bg;
   GameColor color_border;
-  S8 buffer[1024][128];
+  GameColor color_text;
+  S8 buffer[128][1024];
+  S32 last_buffer_index;
 };
 
 typedef struct GameDebugState GameDebugState;
