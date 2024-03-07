@@ -77,6 +77,7 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
     state->game_console_state.color_bg = color_create_from_hex(0x1f1723be);
     state->game_console_state.color_border = color_create_from_hex(0xc6c6c67f);
     state->game_console_state.color_text = color_create_from_hex(0xb4e656ff);
+    state->game_console_state.color_input = color_create_from_hex(0x3ec54bff);
     
     state->game_debug_state.is_on = FALSE;
     state->game_debug_state.dt = 0.016666f;
@@ -163,9 +164,16 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
     
     if (console->is_on && input->text_stream.last_index != 0) {
       S32 i;
+      S8 buffer[4];
+      
       for (i = 0; i < input->text_stream.last_index; ++i) {
-        snprintf(console->buffer[console->last_buffer_index], ARRAY_COUNT(console->buffer[console->last_buffer_index]), "%c", input->text_stream.stream[i]);
-        ++console->last_buffer_index;
+        snprintf(buffer, ARRAY_COUNT(buffer), "%c", input->text_stream.stream[i]);
+        
+        if (console->input_last_index < GAME_CONSOLE_INPUT_MAX_LENGTH) {
+          strcat(console->input, buffer);
+          ++console->input_last_index;
+        }
+        /* TODO: investigate a bug when buffer is almost full - rendering goes wild, I should use GAME_CONSOLE_BUFFER_MAX_STACK_SIZE */
       }
     }
     
@@ -173,9 +181,9 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
     if (counter > 2.0f) {
       counter = 0.0f;
       /* push msg to the end of console buffer  */
-      if (console->last_buffer_index != (ARRAY_COUNT(console->buffer) - 1)) {
-        snprintf(console->buffer[console->last_buffer_index], ARRAY_COUNT(console->buffer[console->last_buffer_index]), "%f", debug->accumulated_dt);
-        ++console->last_buffer_index;
+      if (console->buffer_last_index != (ARRAY_COUNT(console->buffer) - 1)) {
+        snprintf(console->buffer[console->buffer_last_index], ARRAY_COUNT(console->buffer[console->buffer_last_index]), "%f", debug->accumulated_dt);
+        ++console->buffer_last_index;
       }
     }
   }
@@ -397,9 +405,13 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
       
       renderer_text(back_buffer, &state->bmp_font_default, console->color_text, 1, back_buffer->height*0.475f - state->bmp_font_default.glyph_height - 1, ">");
       k = 0;
-      for (i = console->last_buffer_index; i >= 0; --i) {
+      for (i = console->buffer_last_index; i >= 0; --i) {
         renderer_text(back_buffer, &state->bmp_font_default, state->game_console_state.color_text, 10, back_buffer->height*0.475f - state->bmp_font_default.glyph_height - (k * state->bmp_font_default.glyph_height - 1), state->game_console_state.buffer[i]);
         ++k;
+      }
+      
+      for (i = 0; i < console->input_last_index; ++i) {
+        renderer_text(back_buffer, &state->bmp_font_default, state->game_console_state.color_input, 10, back_buffer->height*0.475f - state->bmp_font_default.glyph_height - 1, state->game_console_state.input);
       }
     }
   }
