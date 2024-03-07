@@ -3,6 +3,7 @@
 
 #define GAME_DEFAULT_DATA_RELATIVE_PATH L"..\\data\\"
 #define GAME_BMP_FONT_DEFAULT L"font_default_8x16.bmp"
+#define GAME_INPUT_TEXT_STREAM_LENGTH (128)
 
 EXTERN_OPEN /* extern "C" { */
 
@@ -55,11 +56,18 @@ struct GameControllerInput {
   
 };
 
+typedef struct GameInputTextStream GameInputTextStream;
+struct GameInputTextStream {
+  S8 stream[GAME_INPUT_TEXT_STREAM_LENGTH]; /* samples are cleared at the end of every frame */
+  S32 last_index;
+};
+
 typedef struct GameInput GameInput;
 struct GameInput {
   float dt; /* last frame seconds elapsed */
   V2 mouse_pos;
   GameControllerInput player1;
+  GameInputTextStream text_stream;
 };
 
 typedef struct GameBitmapFont GameBitmapFont;

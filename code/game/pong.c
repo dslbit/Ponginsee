@@ -3,7 +3,11 @@
 -*  |_-> Debug simplified console (with support for integers & floating-point numbers)
 -*  |_-> Texture rendering with ( ) rotation and (X) relative coordinate system (UV) for scaled bitmaps
 -*  |_-> Fix memory bug - maybe I'm pushing more than necessary when resetting a level (is it the particles?)
--*  |_->NOTE: Should I pass the origin to the renderer?
+-*  |_-> NOTE: Should I pass the origin to the renderer?
+-*  |_-> Why debug font text color reset when level reset?
+-*  |_-> Engine console - To every system created, output something to the engine console
+-*  |_-> write to console - func()
+-*  |_-> write to debug - func()
 -*
 -*  |_-> Make a rect bound (in-game) of the screen to shake it when players hit the ball (juice)
 -*  |_-> +1 effect for points when player hit the ball (juice)
@@ -154,6 +158,15 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
     debug = &state->game_debug_state;
     if (input->player1.f9.released) {
       console->is_on = !console->is_on;
+      /* TODO: block player controller and enable text stream - get key samples in the frame, each frame check it and add to the buffer, at the end of the buffer clear the samples */
+    }
+    
+    if (console->is_on && input->text_stream.last_index != 0) {
+      S32 i;
+      for (i = 0; i < input->text_stream.last_index; ++i) {
+        snprintf(console->buffer[console->last_buffer_index], ARRAY_COUNT(console->buffer[console->last_buffer_index]), "%c", input->text_stream.stream[i]);
+        ++console->last_buffer_index;
+      }
     }
     
     counter += input->dt;
@@ -253,8 +266,6 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
       ASSERT(0, L"Invalid game level ID.");
     }
   }
-  
-  /* TODO: Engine console - To every system created, output something to the engine console */
   
   /* NOTE: Engine debug mode drawing over */
   {
@@ -387,7 +398,7 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
       renderer_text(back_buffer, &state->bmp_font_default, console->color_text, 1, back_buffer->height*0.475f - state->bmp_font_default.glyph_height - 1, ">");
       k = 0;
       for (i = console->last_buffer_index; i >= 0; --i) {
-        renderer_text(back_buffer, &state->bmp_font_default, state->game_console_state.color_text, 10, back_buffer->height*0.475f - (k * state->bmp_font_default.glyph_height - 1), state->game_console_state.buffer[i]);
+        renderer_text(back_buffer, &state->bmp_font_default, state->game_console_state.color_text, 10, back_buffer->height*0.475f - state->bmp_font_default.glyph_height - (k * state->bmp_font_default.glyph_height - 1), state->game_console_state.buffer[i]);
         ++k;
       }
     }
