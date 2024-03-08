@@ -303,7 +303,7 @@ INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wp
       pressed = is_down;
       released = (was_down && !is_down) ? TRUE : FALSE;
       
-      if ( (is_down) && ((key >= 'A' && key <= 'Z') || (key >= 'a' && key <= 'z') || (key >= '0' && key <= '9')) ) /*'"!@#$%¨&*()_-+=[]{}/?;:.>,<*/ {
+      if ( (is_down) && ((key >= 'A' && key <= 'Z') || (key >= 'a' && key <= 'z') || (key >= '0' && key <= '9') || (key == ' ') || (key == VK_BACK)) ) /*'"!@#$%¨&*()_-+=[]{}/?;:.>,<*/ {
         game_input->text_stream.stream[game_input->text_stream.last_index] = CAST(S8) key;
         ++game_input->text_stream.last_index;
       }

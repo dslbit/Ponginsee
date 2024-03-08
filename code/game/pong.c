@@ -167,13 +167,19 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
       S8 buffer[4];
       
       for (i = 0; i < input->text_stream.last_index; ++i) {
-        snprintf(buffer, ARRAY_COUNT(buffer), "%c", input->text_stream.stream[i]);
-        
-        if (console->input_last_index < GAME_CONSOLE_INPUT_MAX_LENGTH) {
-          strcat(console->input, buffer);
-          ++console->input_last_index;
+        if (input->text_stream.stream[i] != '\0') {
+          snprintf(buffer, ARRAY_COUNT(buffer), "%c", input->text_stream.stream[i]); /* NOTE: Can I just copy (assign) the 'c' ? */
+          
+          if ( *buffer == 0x08 ) { /* ASCII backspace */ 
+            if (console->input_last_index > 0) {
+              console->input[console->input_last_index - 1] = 0;
+              --console->input_last_index;
+            }
+          } else if (console->input_last_index < GAME_CONSOLE_INPUT_MAX_LENGTH) {
+            strcat(console->input, buffer);
+            ++console->input_last_index;
+          }
         }
-        /* TODO: investigate a bug when buffer is almost full - rendering goes wild, I should use GAME_CONSOLE_BUFFER_MAX_STACK_SIZE */
       }
     }
     
@@ -412,6 +418,7 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
       
       for (i = 0; i < console->input_last_index; ++i) {
         renderer_text(back_buffer, &state->bmp_font_default, state->game_console_state.color_input, 10, back_buffer->height*0.475f - state->bmp_font_default.glyph_height - 1, state->game_console_state.input);
+        /* TODO(Fix): bug when buffer is full - trying to draw the null caracter and the bound check seems to be wrong */
       }
     }
   }

@@ -87,9 +87,9 @@ struct GameConsoleState {
   GameColor color_border;
   GameColor color_text;
   GameColor color_input;
-  S8 buffer[GAME_CONSOLE_BUFFER_MAX_STACK_SIZE][GAME_CONSOLE_INPUT_MAX_LENGTH];
+  S8 buffer[GAME_CONSOLE_BUFFER_MAX_STACK_SIZE][GAME_CONSOLE_INPUT_MAX_LENGTH + 1];
   S32 buffer_last_index;
-  S8 input[GAME_CONSOLE_INPUT_MAX_LENGTH];
+  S8 input[GAME_CONSOLE_INPUT_MAX_LENGTH + 1];
   S32 input_last_index;
 };
 
