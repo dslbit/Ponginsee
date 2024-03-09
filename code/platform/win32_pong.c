@@ -303,10 +303,22 @@ INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wp
       pressed = is_down;
       released = (was_down && !is_down) ? TRUE : FALSE;
       
-      if ( (is_down) && ((key >= 'A' && key <= 'Z') || (key >= 'a' && key <= 'z') || (key >= '0' && key <= '9') || (key == ' ') || (key == VK_BACK)) ) /*'"!@#$%¨&*()_-+=[]{}/?;:.>,<*/ {
+      if ( (is_down) && ((key >= 'A' && key <= 'Z') || (key >= '0' && key <= '9') || (key == ' ') || (key == VK_BACK)) ) /*'"!@#$%¨&*()_-+=[]{}/?;:.>,<*/ {
+#if 0
+        SHORT key_state_capital, key_state_shift;
+        
+        /* NOTE: why does this doesnt work? */
+        key_state_capital = GetKeyState(VK_CAPITAL);
+        key_state_shift = GetKeyState(VK_SHIFT);
+        if ( (((key_state_capital & 0x1) != 0) || ((key_state_shift & 0x1) != 0) ) && (key >= 'A' && key <= 'Z') ) {
+          key += 32; /* offset to 'a' */
+        }
+#endif
+        /* NOTE: Only lower case for now */
         game_input->text_stream.stream[game_input->text_stream.last_index] = CAST(S8) key;
         ++game_input->text_stream.last_index;
       }
+      
       
       switch (key) {
         case VK_F9: {

@@ -101,6 +101,7 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
     state->player = entity_create(ENTITY_TYPE_PLAYER);
     state->player.color = color_create_from_hex(0x4656a5ff);
     state->player.player_data.score_accumulation = 0.0f;
+    input->player1.enabled = TRUE;
     
     state->opponent = entity_create(ENTITY_TYPE_PLAYER);
     state->opponent.color = color_create_from_hex(0xf5464cff);
@@ -159,6 +160,7 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
     debug = &state->game_debug_state;
     if (input->player1.f9.released) {
       console->is_on = !console->is_on;
+      input->player1.enabled = !input->player1.enabled;
       /* TODO: block player controller and enable text stream - get key samples in the frame, each frame check it and add to the buffer, at the end of the buffer clear the samples */
     }
     
@@ -166,6 +168,7 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
       S32 i;
       S8 buffer[4];
       
+      /* TODO: Enter functionality , just copy tot he console buffer and erase de console input buffer */
       for (i = 0; i < input->text_stream.last_index; ++i) {
         if (input->text_stream.stream[i] != '\0') {
           snprintf(buffer, ARRAY_COUNT(buffer), "%c", input->text_stream.stream[i]); /* NOTE: Can I just copy (assign) the 'c' ? */
@@ -196,51 +199,53 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
   
   /* NOTE: Primitve level selection & pause action */
   {
-    /* pause state */
-    if(input->player1.start.released && (state->game_level.id != LEVEL_ID_NULL)) {
-      if (state->is_paused) {
-        state->is_showing_paused_screen = FALSE;
-      }
-      state->is_paused = !state->is_paused;
-    }
-    
-    /* return to menu state */
-    if (input->player1.back.released && (state->game_level.id != LEVEL_ID_NULL)) {
-      if (state->is_paused) {
-        state->is_showing_paused_screen = FALSE;
+    if (input->player1.enabled) {
+      /* pause state */
+      if(input->player1.start.released && (state->game_level.id != LEVEL_ID_NULL)) {
+        if (state->is_paused) {
+          state->is_showing_paused_screen = FALSE;
+        }
         state->is_paused = !state->is_paused;
       }
-      state->game_level.is_initialized = FALSE;
-      state->game_level.is_running = FALSE;
-      state->game_level.id = LEVEL_ID_NULL;
-    }
-    
-    /* press start to play state */
-    if (input->player1.start.released && (state->game_level.id == LEVEL_ID_NULL)) {
-      state->game_level.is_initialized = FALSE;
-      state->game_level.is_running = FALSE;
-      state->game_level.id = LEVEL_ID_CLASSIC;
-    }
-    
-    /* Test level - Collision test */
-    if (input->player1.aux0.released) {
-      state->game_level.is_initialized = FALSE;
-      state->game_level.is_running = FALSE;
-      state->game_level.id = LEVEL_ID_TEST;
-    }
-    
-    /* Load classic level shortcut */
-    if (input->player1.aux1.released) {
-      state->game_level.is_initialized = FALSE;
-      state->game_level.is_running = FALSE;
-      state->game_level.id = LEVEL_ID_CLASSIC;
-    }
-    
-    /* Load horizontal classic level shortcut */
-    if (input->player1.aux2.released) {
-      state->game_level.is_initialized = FALSE;
-      state->game_level.is_running = FALSE;
-      state->game_level.id = LEVEL_ID_HORIZONTAL_CLASSIC;
+      
+      /* return to menu state */
+      if (input->player1.back.released && (state->game_level.id != LEVEL_ID_NULL)) {
+        if (state->is_paused) {
+          state->is_showing_paused_screen = FALSE;
+          state->is_paused = !state->is_paused;
+        }
+        state->game_level.is_initialized = FALSE;
+        state->game_level.is_running = FALSE;
+        state->game_level.id = LEVEL_ID_NULL;
+      }
+      
+      /* press start to play state */
+      if (input->player1.start.released && (state->game_level.id == LEVEL_ID_NULL)) {
+        state->game_level.is_initialized = FALSE;
+        state->game_level.is_running = FALSE;
+        state->game_level.id = LEVEL_ID_CLASSIC;
+      }
+      
+      /* Test level - Collision test */
+      if (input->player1.aux0.released) {
+        state->game_level.is_initialized = FALSE;
+        state->game_level.is_running = FALSE;
+        state->game_level.id = LEVEL_ID_TEST;
+      }
+      
+      /* Load classic level shortcut */
+      if (input->player1.aux1.released) {
+        state->game_level.is_initialized = FALSE;
+        state->game_level.is_running = FALSE;
+        state->game_level.id = LEVEL_ID_CLASSIC;
+      }
+      
+      /* Load horizontal classic level shortcut */
+      if (input->player1.aux2.released) {
+        state->game_level.is_initialized = FALSE;
+        state->game_level.is_running = FALSE;
+        state->game_level.id = LEVEL_ID_HORIZONTAL_CLASSIC;
+      }
     }
   }
   
@@ -552,8 +557,8 @@ INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameM
       player = &state->player;
       v2_zero(&player->acc);
       
-      if (input->player1.up.pressed)    { player->acc.y = -1; }
-      if (input->player1.down.pressed)  { player->acc.y = 1;  }
+      if (input->player1.enabled && input->player1.up.pressed)    { player->acc.y = -1; }
+      if (input->player1.enabled && input->player1.down.pressed)  { player->acc.y = 1;  }
       
       player->acc = v2_mul(player->acc, 5500.0f);
       player->vel = v2_add(player->vel, v2_mul(player->acc, input->dt));

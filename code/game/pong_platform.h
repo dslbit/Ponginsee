@@ -26,6 +26,7 @@ struct GameButtonState {
 
 typedef struct GameControllerInput GameControllerInput;
 struct GameControllerInput {
+  B32 enabled;
   union {
     GameButtonState buttons[19];
     struct {
