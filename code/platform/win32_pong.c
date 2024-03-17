@@ -303,7 +303,7 @@ INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wp
       pressed = is_down;
       released = (was_down && !is_down) ? TRUE : FALSE;
       
-      if ( (is_down) && ((key >= 'A' && key <= 'Z') || (key >= '0' && key <= '9') || (key == ' ') || (key == VK_BACK)) ) /*'"!@#$%¨&*()_-+=[]{}/?;:.>,<*/ {
+      if ( (is_down) && ((key >= 'A' && key <= 'Z') || (key >= '0' && key <= '9') || (key == ' ') || (key == VK_BACK) || (key == VK_RETURN)) ) /*'"!@#$%¨&*()_-+=[]{}/?;:.>,<*/ {
 #if 0
         SHORT key_state_capital, key_state_shift;
         

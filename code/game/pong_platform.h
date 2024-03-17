@@ -31,7 +31,7 @@ struct GameControllerInput {
     GameButtonState buttons[19];
     struct {
       /* engine/game controls */
-      GameButtonState start;
+      GameButtonState start; /* or enter */
       GameButtonState back; /* also used for menu (escape key / select on controller) */
       GameButtonState up;
       GameButtonState down;
@@ -88,9 +88,9 @@ struct GameConsoleState {
   GameColor color_border;
   GameColor color_text;
   GameColor color_input;
-  S8 buffer[GAME_CONSOLE_BUFFER_MAX_STACK_SIZE][GAME_CONSOLE_INPUT_MAX_LENGTH + 1];
+  S8 buffer[GAME_CONSOLE_BUFFER_MAX_STACK_SIZE][GAME_CONSOLE_INPUT_MAX_LENGTH + 1]; /* display buffer */
   S32 buffer_last_index;
-  S8 input[GAME_CONSOLE_INPUT_MAX_LENGTH + 1];
+  S8 input[GAME_CONSOLE_INPUT_MAX_LENGTH + 1]; /* input buffer */
   S32 input_last_index;
 };
 

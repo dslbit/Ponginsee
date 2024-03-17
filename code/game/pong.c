@@ -130,7 +130,7 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
       debug->is_on = !debug->is_on;
     }
     
-    /* dt change*/
+    /* dt change - TODO: change names, it's pageup/pagedown */
     if (debug->is_on) {
       if (input->player1.minus.released) {
         debug->dt += 0.0023334f;
@@ -156,7 +156,7 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
     }
   }
   
-  /* Engine console - Updater */
+  /* Engine console - Update - TODO: buffer view/height indicator and controller to change the display buffer text 'position' */
   {
     GameConsoleState *console;
     GameDebugState *debug;
@@ -166,24 +166,29 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
     debug = &state->game_debug_state;
     if (input->player1.f9.released) {
       console->is_on = !console->is_on;
-      input->player1.enabled = !input->player1.enabled;
-      /* TODO: block player controller and enable text stream - get key samples in the frame, each frame check it and add to the buffer, at the end of the buffer clear the samples */
+      input->player1.enabled = !input->player1.enabled; /* block player game input, keys can be captured via the input buffer and threated individually */
     }
+    
     
     if (console->is_on && input->text_stream.last_index != 0) {
       S32 i;
-      S8 buffer[4];
+      S8 buffer[4]; /* 4 is just an random number, maybe in a frame 4 is enough */
       
-      /* TODO: Enter functionality , just copy tot he console buffer and erase de console input buffer */
+      /* TODO: instead of writting 'snprintf(...)' every single time, make a console_copy_input_to_display_buffer() */
       for (i = 0; i < input->text_stream.last_index; ++i) {
         if (input->text_stream.stream[i] != '\0') {
           snprintf(buffer, ARRAY_COUNT(buffer), "%c", input->text_stream.stream[i]); /* NOTE: Can I just copy (assign) the 'c' ? */
           
-          if ( *buffer == 0x08 ) { /* ASCII backspace */ 
+          if ( *buffer == 0x08 ) { /* ASCII backspace - erase input */ 
             if (console->input_last_index > 0) {
               console->input[console->input_last_index - 1] = 0;
               --console->input_last_index;
             }
+          } else if (*buffer == 0x0D ) { /* ASCII return - moves input to the display buffer and clear old input */
+            snprintf(console->buffer[console->buffer_last_index], ARRAY_COUNT(console->buffer[console->buffer_last_index]), "%s", console->input);
+            ++console->buffer_last_index;
+            debug_zero_array(console->input, ARRAY_COUNT(console->input));
+            console->input_last_index = 0;
           } else if (console->input_last_index < GAME_CONSOLE_INPUT_MAX_LENGTH) {
             strcat(console->input, buffer);
             ++console->input_last_index;
@@ -308,7 +313,7 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
       }
       
       {
-        /* Debug Info (text) */
+        /* Debug Info (text) - TODO: instead of this hacky way of aligning the text to the display screen, make a function debug_info_add(s, ...) */
         F32 text_x, text_y, text_yspacing;
         S8 text_buffer[1024] = {0};
         
