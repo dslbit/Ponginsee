@@ -14,25 +14,46 @@ EXTERN_OPEN /* extern "C" { */
 
 typedef struct GameMemory GameMemory;
 struct GameMemory {
-  U64 max_size; /* in bytes */
-  U64 current_size; /* in bytes */
-  void *address; /* base address */
+  U64 permanent_max_size; /* in bytes */
+  U64 permanent_current_size; /* in bytes */
+  void *permanent_address; /* base address */
+  
+  U64 transient_max_size;
+  U64 transient_current_size;
+  void *transient_address;
   
   PlatformFreeEntireFileFuncType *platform_free_entire_file;
   PlatformReadEntireFileFuncType *platform_read_entire_file;
   PlatformWriteEntireFileFuncType *platform_write_entire_file;
 };
 
-INTERNAL INLINE void *game_memory_push(GameMemory *memory, U64 push_size) {
+INTERNAL void *game_memory_push_permanent(GameMemory *memory, U64 push_size) {
   void *result;
   
-  if (memory->max_size - memory->current_size > push_size) {
-    result = CAST(void *) (CAST(U8 *) memory->address + memory->current_size);
-    memory->current_size += push_size;
+  if (memory->permanent_max_size - memory->permanent_current_size > push_size) {
+    result = CAST(void *) (CAST(U8 *) memory->permanent_address + memory->permanent_current_size);
+    memory->permanent_current_size += push_size;
   } else {
     ASSERT(0, L"Game needs more memory!");
   }
   return result;
+}
+
+INTERNAL void *game_memory_push_transient(GameMemory *memory, U64 push_size) {
+  void *result;
+  
+  if (memory->transient_max_size - memory->transient_current_size > push_size) {
+    result = CAST(void *) (CAST(U8 *) memory->transient_address + memory->transient_current_size);
+    memory->transient_current_size += push_size;
+  } else {
+    ASSERT(0, L"Game needs more memory!");
+  }
+  return result;
+}
+
+INTERNAL void game_memory_clear_transient(GameMemory *memory) {
+  debug_zero_array(memory->transient_address, memory->transient_max_size);
+  memory->transient_current_size = 0;
 }
 
 EXTERN_CLOSE /* } */

@@ -36,7 +36,7 @@ INTERNAL ParticleSystem particle_system_create(GameMemory *memory, B32 is_ready_
   ps.is_looping = is_looping;
   ps.loop_delay = loop_delay;
   ps.particles_count = particles_count;
-  ps.particles = game_memory_push(memory, (particles_count * sizeof(Particle)));
+  ps.particles = game_memory_push_transient(memory, (particles_count * sizeof(Particle)));
   for (i = 0; i < particles_count; ++i) {
     ps.particles[i].pos = ps.pos;
     ps.particles[i].width = particles_width;

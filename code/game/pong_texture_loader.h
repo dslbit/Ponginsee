@@ -84,7 +84,7 @@ INTERNAL Texture load_bitmap(GameMemory *memory, U16 *file_name) {
       U32 *texture_pixels;
       
       texture_size = result.width * result.height * DEFAULT_TEXTURE_BYTES_PER_PIXEL;
-      result.data = game_memory_push(memory, texture_size);
+      result.data = game_memory_push_permanent(memory, texture_size);
       if (!result.data) {
         ASSERT(0, L"Game couldn't allocate memory for the texture!");
       }

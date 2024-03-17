@@ -599,8 +599,10 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
     
     /* Asks for memory to be used by the game */
     {
-      game_memory.max_size = MEGABYTE(50);
-      game_memory.address = VirtualAlloc(0, game_memory.max_size, (MEM_RESERVE | MEM_COMMIT), PAGE_READWRITE);
+      game_memory.permanent_max_size = MEGABYTE(50);
+      game_memory.permanent_address = VirtualAlloc(0, game_memory.permanent_max_size, (MEM_RESERVE | MEM_COMMIT), PAGE_READWRITE);
+      game_memory.transient_max_size = MEGABYTE(25);
+      game_memory.transient_address = VirtualAlloc(0, game_memory.transient_max_size, (MEM_RESERVE | MEM_COMMIT), PAGE_READWRITE);
       game_memory.platform_free_entire_file = win32_debug_free_entire_file;
       game_memory.platform_read_entire_file = win32_debug_read_entire_file;
       game_memory.platform_write_entire_file = win32_debug_write_entire_file;
@@ -609,9 +611,9 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
       {
         U64 game_state_size;
         
-        ASSERT(game_memory.current_size == 0, L"'game_state' should be the first in 'game_memory'!"); /* @IMPORTANT: This is needed because in the game I cast the game_state pointer to the base address of the game memory */
+        ASSERT(game_memory.permanent_current_size == 0, L"'game_state' should be the first in 'game_memory'!"); /* @IMPORTANT: This is needed because in the game I cast the game_state pointer to the base address of the game memory */
         game_state_size = sizeof(GameState);
-        game_state = CAST(GameState *) game_memory_push(&game_memory, game_state_size);
+        game_state = CAST(GameState *) game_memory_push_permanent(&game_memory, game_state_size);
       }
       
       /* pushing 'GameBackBuffer' to game memory */
@@ -619,7 +621,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
         U64 game_back_buffer_size;
         
         game_back_buffer_size = sizeof(GameBackBuffer);
-        game_back_buffer = CAST(GameBackBuffer *) game_memory_push(&game_memory, game_back_buffer_size);
+        game_back_buffer = CAST(GameBackBuffer *) game_memory_push_permanent(&game_memory, game_back_buffer_size);
       }
       
       /* pushing 'GameInput' to game memory */
@@ -627,7 +629,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
         U64 game_input_size;
         
         game_input_size = sizeof(GameInput);
-        game_input = CAST(GameInput *) game_memory_push(&game_memory, game_input_size);
+        game_input = CAST(GameInput *) game_memory_push_permanent(&game_memory, game_input_size);
       }
       
     }
