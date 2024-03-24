@@ -52,11 +52,9 @@
 #include "pong_entity.h"
 #include "pong_collision.h"
 #include "pong_level.h"
+#include "pong_console.h"
 #include "pong_platform.h"
 #include "pong_renderer.h"
-
-/* IMPORTANT: Temporary; Replace! */
-#include "stdio.h" /* used for snprintf() */
 
 /* NOTE: What if other levels have the same movement code? */
 INTERNAL void level_null(GameBackBuffer *back_buffer, GameInput *input, GameMemory *memory);
@@ -65,7 +63,7 @@ INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameM
 INTERNAL void level_end(GameBackBuffer *back_buffer, GameInput *input, GameMemory *memory);
 
 void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameMemory *memory) {
-  GameState *state;
+  GameState *state; /* TODO: Do the same for other global game states (debug, console...) */
   
   ASSERT(sizeof(GameState) < memory->permanent_max_size, L"NOT ENOUGH MEMORY!");
   state = CAST(GameState *) memory->permanent_address;
@@ -169,26 +167,24 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
       input->player1.enabled = !input->player1.enabled; /* block player game input, keys can be captured via the input buffer and threated individually */
     }
     
-    
     if (console->is_on && input->text_stream.last_index != 0) {
       S32 i;
-      S8 buffer[4]; /* 4 is just an random number, maybe in a frame 4 is enough */
+      S8 buffer[128]; /* 4 is just an random number, maybe in a frame 4 is enough */
       
       /* TODO: instead of writting 'snprintf(...)' every single time, make a console_copy_input_to_display_buffer() */
+      ASSERT(input->text_stream.last_index <= ARRAY_COUNT(buffer), "Buffer overrun alert!");
       for (i = 0; i < input->text_stream.last_index; ++i) {
         if (input->text_stream.stream[i] != '\0') {
-          snprintf(buffer, ARRAY_COUNT(buffer), "%c", input->text_stream.stream[i]); /* NOTE: Can I just copy (assign) the 'c' ? */
+          buffer[i] = input->text_stream.stream[i];
+          //snprintf(buffer, ARRAY_COUNT(buffer), "%c", input->text_stream.stream[i]); /* NOTE: Can I just copy (assign) the 'c' ? */
           
-          if ( *buffer == 0x08 ) { /* ASCII backspace - erase input */ 
+          if ( buffer[i] == 0x08 ) { /* ASCII backspace - erase input */ 
             if (console->input_last_index > 0) {
               console->input[console->input_last_index - 1] = 0;
               --console->input_last_index;
             }
-          } else if (*buffer == 0x0D ) { /* ASCII return - moves input to the display buffer and clear old input */
-            snprintf(console->buffer[console->buffer_last_index], ARRAY_COUNT(console->buffer[console->buffer_last_index]), "%s", console->input);
-            ++console->buffer_last_index;
-            debug_zero_array(console->input, ARRAY_COUNT(console->input));
-            console->input_last_index = 0;
+          } else if ( buffer[i] == 0x0D ) { /* ASCII return - moves input to the display buffer and clear old input */
+            console_move_input_to_display_buffer(console);
           } else if (console->input_last_index < GAME_CONSOLE_INPUT_MAX_LENGTH) {
             strcat(console->input, buffer);
             ++console->input_last_index;
@@ -200,11 +196,14 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
     counter += input->dt;
     if (counter > 2.0f) {
       counter = 0.0f;
+      console_write(console, "Console buffer update test!");
+#if 0
       /* push msg to the end of console buffer  */
       if (console->buffer_last_index != (ARRAY_COUNT(console->buffer) - 1)) {
         snprintf(console->buffer[console->buffer_last_index], ARRAY_COUNT(console->buffer[console->buffer_last_index]), "%f", debug->accumulated_dt);
         ++console->buffer_last_index;
       }
+#endif
     }
   }
   
@@ -422,6 +421,7 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
       renderer_filled_rect(back_buffer, back_buffer->width/2.0f, (back_buffer->height*0.475f) + 1, CAST(F32) back_buffer->width, 1, state->game_console_state.color_border); /* console bottom border */
       
       renderer_text(back_buffer, &state->bmp_font_default, console->color_text, 1, back_buffer->height*0.475f - state->bmp_font_default.glyph_height - 1, ">");
+      renderer_text(back_buffer, &state->bmp_font_default, console->color_text, CAST(F32) ((1 + console->input_last_index) * state->bmp_font_default.glyph_width + 1), back_buffer->height*0.475f - state->bmp_font_default.glyph_height - 1, "|");
       k = 0;
       for (i = console->buffer_last_index; i >= 0; --i) {
         renderer_text(back_buffer, &state->bmp_font_default, state->game_console_state.color_text, 10, back_buffer->height*0.475f - state->bmp_font_default.glyph_height - (k * state->bmp_font_default.glyph_height - 1), state->game_console_state.buffer[i]);

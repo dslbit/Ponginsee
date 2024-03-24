@@ -4,8 +4,7 @@
 #define GAME_DEFAULT_DATA_RELATIVE_PATH L"..\\data\\"
 #define GAME_BMP_FONT_DEFAULT L"font_default_8x16.bmp"
 #define GAME_INPUT_TEXT_STREAM_LENGTH (128)
-#define GAME_CONSOLE_BUFFER_MAX_STACK_SIZE (128)
-#define GAME_CONSOLE_INPUT_MAX_LENGTH (64)
+
 
 EXTERN_OPEN /* extern "C" { */
 
@@ -79,19 +78,6 @@ struct GameBitmapFont {
   S32 glyph_height;
   /* TODO: Lookup table */
   Texture bmp;
-};
-
-typedef struct GameConsoleState GameConsoleState;
-struct GameConsoleState {
-  B32 is_on;
-  GameColor color_bg;
-  GameColor color_border;
-  GameColor color_text;
-  GameColor color_input;
-  S8 buffer[GAME_CONSOLE_BUFFER_MAX_STACK_SIZE][GAME_CONSOLE_INPUT_MAX_LENGTH + 1]; /* display buffer */
-  S32 buffer_last_index;
-  S8 input[GAME_CONSOLE_INPUT_MAX_LENGTH + 1]; /* input buffer */
-  S32 input_last_index;
 };
 
 typedef struct GameDebugState GameDebugState;
