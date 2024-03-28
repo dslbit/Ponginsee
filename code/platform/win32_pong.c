@@ -303,7 +303,7 @@ INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wp
       pressed = is_down;
       released = (was_down && !is_down) ? TRUE : FALSE;
       
-      if ( (is_down) && ((key >= 'A' && key <= 'Z') || (key >= '0' && key <= '9') || (key == ' ') || (key == VK_BACK) || (key == VK_RETURN)) ) /*'"!@#$%¨&*()_-+=[]{}/?;:.>,<*/ {
+      if ( (is_down) && ((key >= 'A' && key <= 'Z') || (key >= '0' && key <= '9') || (key == ' ') || (key == VK_BACK) || (key == VK_RETURN) || (key == ','))  ) /*'"!@#$%¨&*()_-+=[]{}/?;:.>,<*/ {
 #if 0
         SHORT key_state_capital, key_state_shift;
         
@@ -318,6 +318,45 @@ INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wp
         game_input->text_stream.stream[game_input->text_stream.last_index] = CAST(S8) key;
         ++game_input->text_stream.last_index;
       }
+#if 0
+      else {
+        if ( (is_down) ) {
+          switch (key) {
+            case ',':
+            case '.':
+            case ';':
+            case ':':
+            case '-':
+            case '+':
+            case '?':
+            case '\'':
+            case '\"':
+            case '!':
+            case '@':
+            case '#':
+            case '$':
+            case '%':
+            case '&':
+            case '*':
+            case '(':
+            case ')':
+            case '[':
+            case ']':
+            case '{':
+            case '}':
+            case '=':
+            case '\\':
+            case '|':
+            case '/':
+            {
+              game_input->text_stream.stream[game_input->text_stream.last_index] = CAST(S8) key;
+              ++game_input->text_stream.last_index;
+            } break;
+          }
+        }
+      }
+      
+#endif
       
       
       switch (key) {

@@ -22,6 +22,7 @@ struct GameConsoleState {
   S32 input_last_index;
 };
 
+/* TODO: ring buffer */
 INTERNAL void console_write(GameConsoleState *console, S8 *str) {
   if (console->buffer_last_index <= (ARRAY_COUNT(console->buffer) - 1)) {
     snprintf(console->buffer[console->buffer_last_index], ARRAY_COUNT(console->buffer[console->buffer_last_index]), "%s", str);
@@ -29,6 +30,7 @@ INTERNAL void console_write(GameConsoleState *console, S8 *str) {
   }
 }
 
+/* TODO: Error check & ring buffer? */
 INTERNAL void console_move_input_to_display_buffer(GameConsoleState *console) {
   snprintf(console->buffer[console->buffer_last_index], ARRAY_COUNT(console->buffer[console->buffer_last_index]), "%s", console->input); /* TODO: replace for custom func */
   ++console->buffer_last_index;

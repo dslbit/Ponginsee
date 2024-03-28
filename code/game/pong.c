@@ -162,49 +162,68 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
     
     console = &state->game_console_state;
     debug = &state->game_debug_state;
-    if (input->player1.f9.released) {
+    if (input->player1.f9.released) { /* TODO: Close the engine console with 'esc' too */
       console->is_on = !console->is_on;
       input->player1.enabled = !input->player1.enabled; /* block player game input, keys can be captured via the input buffer and threated individually */
     }
     
     if (console->is_on && input->text_stream.last_index != 0) {
       S32 i;
-      S8 buffer[128]; /* 4 is just an random number, maybe in a frame 4 is enough */
       
-      /* TODO: instead of writting 'snprintf(...)' every single time, make a console_copy_input_to_display_buffer() */
-      ASSERT(input->text_stream.last_index <= ARRAY_COUNT(buffer), "Buffer overrun alert!");
-      for (i = 0; i < input->text_stream.last_index; ++i) {
-        if (input->text_stream.stream[i] != '\0') {
-          buffer[i] = input->text_stream.stream[i];
-          //snprintf(buffer, ARRAY_COUNT(buffer), "%c", input->text_stream.stream[i]); /* NOTE: Can I just copy (assign) the 'c' ? */
-          
-          if ( buffer[i] == 0x08 ) { /* ASCII backspace - erase input */ 
+      if (console->input_last_index + input->text_stream.last_index < GAME_CONSOLE_INPUT_MAX_LENGTH) {
+        S32 sum;
+        
+        sum = 0;
+        for (i = 0; i < input->text_stream.last_index; ++i) {
+          if ( input->text_stream.stream[i] == 0x08 ) { /* ASCII backspace - erase input */ 
             if (console->input_last_index > 0) {
-              console->input[console->input_last_index - 1] = 0;
+              console->input[console->input_last_index - 1] = 0; /* TODO: It seems that the bug is near here - when I try to show the buffer after filling it and doing 1 backspace, it bugs out */
               --console->input_last_index;
+            } else {
+              *input->text_stream.stream = '\0';
             }
-          } else if ( buffer[i] == 0x0D ) { /* ASCII return - moves input to the display buffer and clear old input */
+          } else if ( input->text_stream.stream[i] == 0x0D ) { /* ASCII return - moves input to the display buffer and clear old input */
             console_move_input_to_display_buffer(console);
-          } else if (console->input_last_index < GAME_CONSOLE_INPUT_MAX_LENGTH) {
-            strcat(console->input, buffer);
-            ++console->input_last_index;
+          }
+          
+          /* if is not invalid, copy the character */
+          {
+            if ( (input->text_stream.stream[i] >= 32) && (input->text_stream.stream[i] <= 126) ) {
+              console->input[console->input_last_index] = input->text_stream.stream[i];
+              ++console->input_last_index;
+            }
+            
           }
         }
+        
+#if 0
+        strcat(console->input, input->text_stream.stream);
+        console->input_last_index += sum;
+#endif
+        
+      } else {
+        for (i = 0; i < input->text_stream.last_index; ++i) {
+          if ( input->text_stream.stream[i] == 0x08 ) { /* ASCII backspace - erase input */ 
+            console->input[console->input_last_index - 1] = 0;
+            --console->input_last_index;
+          }
+        }
+        
       }
     }
     
+#if 0
     counter += input->dt;
     if (counter > 2.0f) {
       counter = 0.0f;
       console_write(console, "Console buffer update test!");
-#if 0
       /* push msg to the end of console buffer  */
       if (console->buffer_last_index != (ARRAY_COUNT(console->buffer) - 1)) {
         snprintf(console->buffer[console->buffer_last_index], ARRAY_COUNT(console->buffer[console->buffer_last_index]), "%f", debug->accumulated_dt);
         ++console->buffer_last_index;
       }
-#endif
     }
+#endif
   }
   
   /* NOTE: Primitve level selection & pause action */
@@ -421,7 +440,9 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
       renderer_filled_rect(back_buffer, back_buffer->width/2.0f, (back_buffer->height*0.475f) + 1, CAST(F32) back_buffer->width, 1, state->game_console_state.color_border); /* console bottom border */
       
       renderer_text(back_buffer, &state->bmp_font_default, console->color_text, 1, back_buffer->height*0.475f - state->bmp_font_default.glyph_height - 1, ">");
-      renderer_text(back_buffer, &state->bmp_font_default, console->color_text, CAST(F32) ((1 + console->input_last_index) * state->bmp_font_default.glyph_width + 1), back_buffer->height*0.475f - state->bmp_font_default.glyph_height - 1, "|");
+#if 1
+      renderer_text(back_buffer, &state->bmp_font_default, console->color_text, CAST(F32) ((1 + console->input_last_index) * state->bmp_font_default.glyph_width + 1), back_buffer->height*0.475f - state->bmp_font_default.glyph_height - 1, "|"); /* cursor/caret indication */
+#endif
       k = 0;
       for (i = console->buffer_last_index; i >= 0; --i) {
         renderer_text(back_buffer, &state->bmp_font_default, state->game_console_state.color_text, 10, back_buffer->height*0.475f - state->bmp_font_default.glyph_height - (k * state->bmp_font_default.glyph_height - 1), state->game_console_state.buffer[i]);
@@ -429,6 +450,9 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
       }
       
       for (i = 0; i < console->input_last_index; ++i) {
+        if (console->input[i] == '\0') {
+          break;
+        }
         renderer_text(back_buffer, &state->bmp_font_default, state->game_console_state.color_input, 10, back_buffer->height*0.475f - state->bmp_font_default.glyph_height - 1, state->game_console_state.input);
         /* TODO(Fix): bug when buffer is full - trying to draw the null caracter and the bound check seems to be wrong */
       }
