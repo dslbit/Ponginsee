@@ -159,6 +159,7 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
     GameConsoleState *console;
     GameDebugState *debug;
     LOCAL F32 counter; /* NOTE: temp, @cleanup */
+    B32 is_text_stream_empty;
     
     console = &state->game_console_state;
     debug = &state->game_debug_state;
@@ -167,7 +168,9 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
       input->player1.enabled = !input->player1.enabled; /* block player game input, keys can be captured via the input buffer and threated individually */
     }
     
-    if (console->is_on && input->text_stream.last_index != 0) {
+    /* TODO: resize buffer size for max msg storage */
+    is_text_stream_empty = (input->text_stream.last_index == 0);
+    if (console->is_on && !is_text_stream_empty) {
       S32 i;
       
       if (console->input_last_index + input->text_stream.last_index < GAME_CONSOLE_INPUT_MAX_LENGTH) {
@@ -182,7 +185,7 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
             } else {
               *input->text_stream.stream = '\0';
             }
-          } else if ( input->text_stream.stream[i] == 0x0D ) { /* ASCII return - moves input to the display buffer and clear old input */
+          } else if ( input->text_stream.stream[i] == 0x0D) { /* ASCII return - moves input to the display buffer and clear old input */
             console_move_input_to_display_buffer(console);
           }
           
@@ -203,9 +206,11 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
         
       } else {
         for (i = 0; i < input->text_stream.last_index; ++i) {
-          if ( input->text_stream.stream[i] == 0x08 ) { /* ASCII backspace - erase input */ 
+          if ( input->text_stream.stream[i] == 0x08 ) { /* ASCII backspace - (erase input) when input is full*/ 
             console->input[console->input_last_index - 1] = 0;
             --console->input_last_index;
+          } else if (input->text_stream.stream[i] == 0x0D) { /* ASCII return - (moves input to the display buffer) when input is full */
+            console_move_input_to_display_buffer(console);
           }
         }
         
