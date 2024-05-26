@@ -114,6 +114,7 @@ struct GameState {
   GameColor text_default_color;
   GameColor text_color_red;
   GameColor text_color_green;
+  GameColor text_color_black;
   /* --- */
   
   GameColor background_color;

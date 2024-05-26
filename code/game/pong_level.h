@@ -8,7 +8,7 @@ EXTERN_OPEN /* extern "C" { */
 
 typedef enum LevelID LevelID;
 enum LevelID {
-  LEVEL_ID_NULL,
+  LEVEL_ID_MENU,
   LEVEL_ID_TEST,
   LEVEL_ID_CLASSIC,
   LEVEL_ID_END,

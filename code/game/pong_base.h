@@ -151,4 +151,11 @@ INTERNAL INLINE F32 random_f32_range(F32 min, F32 max) {
   return result;
 }
 
+/* NOTE: I really need a string library */
+INTERNAL U64 debug_string_len(S8 *str) {
+  U64 result;
+  for (result = 0; *str; result++, str++);
+  return result;
+}
+
 #endif /* PONG_BASE_H */

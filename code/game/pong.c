@@ -1,42 +1,33 @@
 /*
--* TODO LIST:
+-* ROBUST PASS:
 -*  |_-> Debug simplified console (with support for integers & floating-point numbers)
--*   |_-> commands: load_level
--*   |_-> what about tunning & query variables through the console? e.g.: turn_on_particles, turn_off_trails...
+-*   |_-> (for the future) What about tunning & query variables through the console? e.g.: turn_on_particles, turn_off_trails...
+-*   |_-> (for the future) Commands like load_level,  etc.
+-*   |_-> (for the future) To every system created, output something to the engine console using a certain debug level
+-*   |_-> (for the future) Find a way to display the current level in the debug infos
 -*  |_-> Texture rendering with ( ) rotation and (X) relative coordinate system (UV) for scaled bitmaps
--*  |_-> Fix memory bug - maybe I'm pushing more than necessary when resetting a level (is it the particles?)
+-*  
 -*  |_-> NOTE: Should I pass the origin to the renderer?
--*  |_-> Why debug font text color reset when level reset?
--*  |_-> Engine console - To every system created, output something to the engine console
--*  |_-> write to console - func()
--*  |_-> write to debug - func()
--*  |_-> find a way to display the current level in the debug infos
--*
--*  |_-> Make a rect bound (in-game) of the screen to shake it when players hit the ball (juice)
 -*  |_-> +1 effect for points when player hit the ball (juice)
--* 
+-*  
 -*  |_-> Pull out the entity vs arena code? Maybe return a v2 -1 to 1 range to
 -*  identify where entity was before going out of bounds
--*
--*  |_-> Simple start menu (Play, Quit) and pause menu (Return, Quit), no text
--*  for now, just a visual representation - for now I only have the menu state,
--*  no visual representation at the moment.
--*
+-*  |_-> (for the future) Save progress? - IDK how crazy this will get, so do it only if it's
+-*  needed
+-*  
+-*  |_-> Figure out text rendering using (X) Bitmaps & () TrueType
+-*  
+-*  |_-> Robust debug info and engine console.
+-*  
 -*  |_-> Menu screen (Play, Scoreboard (stores personal records), Settings
 -*  (Resolution, Audio, Controls), Quit)
 -*  |_-> Pause menu (Main menu, Quit Game)
--*   |_-> Only have pause state for now.
--*  |_-> Save progress? - IDK how crazy this will get, so do it only if it's
--*  needed
--*
--*  |_-> Figure out text rendering using (X) Bitmaps & () TrueType
+#---
+-* TODO LIST:
 -*  |_-> Figure out the sound engine
 -*  |_-> Platform-independent: sound output
--*  |_-> Robust debug info and engine console.
 -*
--*
--*
--*
+#---
 -* NOTE:
 -*  |_-> When I press the pause button when go fullscreen on/off, the 'back buffer' is not rendered.
 -* 
@@ -57,7 +48,7 @@
 #include "pong_renderer.h"
 
 /* NOTE: What if other levels have the same movement code? */
-INTERNAL void level_null(GameBackBuffer *back_buffer, GameInput *input, GameMemory *memory);
+INTERNAL void level_menu(GameBackBuffer *back_buffer, GameInput *input, GameMemory *memory);
 INTERNAL void level_test(GameBackBuffer *back_buffer, GameInput *input, GameMemory *memory);
 INTERNAL void level_classic(GameBackBuffer *back_buffer, GameInput *input, GameMemory *memory);
 INTERNAL void level_end(GameBackBuffer *back_buffer, GameInput *input, GameMemory *memory);
@@ -76,6 +67,7 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
     state->text_default_color = color_create_from_hex(0xefd081ff);
     state->text_color_green = color_create_from_hex(0x3ec54bff);
     state->text_color_red = color_create_from_hex(0xf5464cff);
+    state->text_color_black = color_create_from_hex(0x1f1723be);
     
     state->game_console_state.is_on = FALSE;
     state->game_console_state.color_bg = color_create_from_hex(0x1f1723be);
@@ -92,11 +84,11 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
     state->background_color_paused = color_create_from_hex(0xefd08180);
     /* NOTE: Maybe this should be moved to the level update function
         initialization place */
-    state->game_level.id = LEVEL_ID_NULL;
+    state->game_level.id = LEVEL_ID_MENU;
     state->game_level.is_initialized = FALSE;
     state->game_level.is_running = FALSE;
     state->game_level.time_elapsed = 0.0f;
-    state->game_level.time_max = 60.0f;
+    state->game_level.time_max = 5.0f;
     state->game_level.min_bounding_rect_x = 0;
     state->game_level.max_bounding_rect_x = back_buffer->width;
     state->game_level.min_bounding_rect_y = 0;
@@ -235,7 +227,7 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
   {
     if (input->player1.enabled) {
       /* pause state */
-      if(input->player1.start.released && (state->game_level.id != LEVEL_ID_NULL)) {
+      if(input->player1.start.released && (state->game_level.id != LEVEL_ID_MENU)) {
         if (state->is_paused) {
           state->is_showing_paused_screen = FALSE;
         }
@@ -243,24 +235,25 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
       }
       
       /* return to menu state */
-      if (input->player1.back.released && (state->game_level.id != LEVEL_ID_NULL)) {
+      if (input->player1.back.released && (state->game_level.id != LEVEL_ID_MENU)) {
         if (state->is_paused) {
           state->is_showing_paused_screen = FALSE;
           state->is_paused = !state->is_paused;
         }
         state->game_level.is_initialized = FALSE;
         state->game_level.is_running = FALSE;
-        state->game_level.id = LEVEL_ID_NULL;
+        state->game_level.id = LEVEL_ID_MENU;
         game_memory_clear_transient(memory);
       }
       
       /* press start to play state */
-      if (input->player1.start.released && (state->game_level.id == LEVEL_ID_NULL)) {
+      if (input->player1.start.released && (state->game_level.id == LEVEL_ID_MENU)) {
         state->game_level.is_initialized = FALSE;
         state->game_level.is_running = FALSE;
         state->game_level.id = LEVEL_ID_CLASSIC;
       }
       
+      /* TODO: assert to only dev build */
       /* Load test level shortcut - Collision test */
       if (input->player1.aux0.released) {
         state->game_level.is_initialized = FALSE;
@@ -291,8 +284,8 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
   
   /* NOTE: Level update and render */
   switch (state->game_level.id) {
-    case LEVEL_ID_NULL: {
-      level_null(back_buffer, input, memory);
+    case LEVEL_ID_MENU: {
+      level_menu(back_buffer, input, memory);
     } break;
     
     case LEVEL_ID_TEST: {
@@ -465,11 +458,11 @@ void game_update_and_render(GameBackBuffer *back_buffer, GameInput *input, GameM
   }
 }
 
-INTERNAL void level_null(GameBackBuffer *back_buffer, GameInput *input, GameMemory *memory) {
+INTERNAL void level_menu(GameBackBuffer *back_buffer, GameInput *input, GameMemory *memory) {
   GameState *state;
   
   state = CAST(GameState *) memory->permanent_address;
-  /* Null level: setup */
+  /* Menu level: setup */
   if (!state->game_level.is_initialized) {
     state->game_level.is_initialized = TRUE;
     state->game_level.is_running = TRUE;
@@ -480,13 +473,25 @@ INTERNAL void level_null(GameBackBuffer *back_buffer, GameInput *input, GameMemo
     v2_zero(&state->ball.vel);
   }
   
-  /* Null level: update */
-  {}
+  /* Menu level: update */
+  {
+    
+  }
   
-  /* Null level: rendering */
+  /* Menu level: rendering */
   {
     /* TODO: Better background clear */
     renderer_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, state->background_color);
+    
+    {
+      S8 *start_game_text = "PRESS ENTER TO START THE GAME!";
+      U64 text_len;
+      F32 text_pos_x;
+      
+      text_len = debug_string_len(start_game_text);
+      text_pos_x = (back_buffer->width - (text_len * state->bmp_font_default.glyph_width)) / 2.0f;
+      renderer_text(back_buffer, &state->bmp_font_default, state->text_default_color, text_pos_x, back_buffer->height/2.0f, start_game_text);
+    }
   }
 }
 
@@ -966,7 +971,7 @@ INTERNAL void level_end(GameBackBuffer *back_buffer, GameInput *input, GameMemor
     if (state->game_level.time_elapsed >= state->game_level.time_max) {
       state->game_level.is_initialized = FALSE;
       state->game_level.is_running = FALSE;
-      state->game_level.id = LEVEL_ID_NULL;
+      state->game_level.id = LEVEL_ID_MENU;
     }
   }
   
@@ -978,6 +983,16 @@ INTERNAL void level_end(GameBackBuffer *back_buffer, GameInput *input, GameMemor
     
     /* TODO: Better background clear */
     renderer_filled_rect(back_buffer, back_buffer->width/2.0f, back_buffer->height/2.0f, CAST(F32) back_buffer->width, CAST(F32) back_buffer->height, end_background_color);
+    
+    {
+      S8 *start_game_text = "YOU WON!";
+      U64 text_len;
+      F32 text_pos_x;
+      
+      text_len = debug_string_len(start_game_text);
+      text_pos_x = (back_buffer->width - (text_len * state->bmp_font_default.glyph_width)) / 2.0f;
+      renderer_text(back_buffer, &state->bmp_font_default, state->text_color_black, text_pos_x, back_buffer->height/2.0f, start_game_text);
+    }
   }
 }
 

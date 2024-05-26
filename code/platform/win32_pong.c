@@ -291,7 +291,8 @@ INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wp
     case WM_SYSKEYDOWN:
     case WM_SYSKEYUP: {
       DWORD key;
-      B32 is_down, was_down, pressed, released;
+      B32 is_down, was_down, pressed, released, is_valid_game_input_text_stream;
+      LOCAL is_shift_down;
       
       if (game_input == 0) {
         break;
@@ -302,62 +303,83 @@ INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wp
       is_down = ( (lparam & (1 << 31)) == 0 );
       pressed = is_down;
       released = (was_down && !is_down) ? TRUE : FALSE;
-      
-      if ( (is_down) && ((key >= 'A' && key <= 'Z') || (key >= '0' && key <= '9') || (key == ' ') || (key == VK_BACK) || (key == VK_RETURN) || (key == ','))  ) /*'"!@#$%¨&*()_-+=[]{}/?;:.>,<*/ {
-#if 0
-        SHORT key_state_capital, key_state_shift;
-        
-        /* NOTE: why does this doesnt work? */
-        key_state_capital = GetKeyState(VK_CAPITAL);
-        key_state_shift = GetKeyState(VK_SHIFT);
-        if ( (((key_state_capital & 0x1) != 0) || ((key_state_shift & 0x1) != 0) ) && (key >= 'A' && key <= 'Z') ) {
-          key += 32; /* offset to 'a' */
-        }
-#endif
-        /* NOTE: Only lower case for now */
-        game_input->text_stream.stream[game_input->text_stream.last_index] = CAST(S8) key;
-        ++game_input->text_stream.last_index;
+      if (pressed && key == VK_SHIFT) {
+        is_shift_down = TRUE;
+      } else if (released && key == VK_SHIFT) {
+        is_shift_down = FALSE;
       }
-#if 0
-      else {
-        if ( (is_down) ) {
+      
+      /* TODO: debug build only for game/engine console and debug info key/event handling */
+      if (is_down) {
+        key = key;
+        if (key == '1' && is_shift_down) {
+          key = '!';
+        }
+      }
+      
+      is_valid_game_input_text_stream = FALSE;
+      {
+        if ( (key >= 'A' && key <= 'Z') || (key >= '0' && key <= '9') || (key == ' ') || (key == VK_BACK) || (key == VK_RETURN) || (key == VK_OEM_COMMA) || (key == VK_OEM_PERIOD) || (key == '!')) {
+          is_valid_game_input_text_stream = TRUE;
+        } else {
           switch (key) {
-            case ',':
-            case '.':
-            case ';':
-            case ':':
-            case '-':
-            case '+':
-            case '?':
-            case '\'':
-            case '\"':
-            case '!':
-            case '@':
-            case '#':
-            case '$':
-            case '%':
-            case '&':
-            case '*':
-            case '(':
-            case ')':
-            case '[':
-            case ']':
-            case '{':
-            case '}':
-            case '=':
-            case '\\':
-            case '|':
-            case '/':
-            {
-              game_input->text_stream.stream[game_input->text_stream.last_index] = CAST(S8) key;
-              ++game_input->text_stream.last_index;
-            } break;
+            default: {
+              
+            }
           }
         }
       }
       
+      if (is_down && is_valid_game_input_text_stream) /*'"!@#$%¨&*()_-+=[]{}/?;:.>,<*/ {
+        /* NOTE: I have no idea a smarter way to do this for now, but at least it works */
+        switch(key) {
+          case VK_OEM_COMMA: {
+            game_input->text_stream.stream[game_input->text_stream.last_index] = ',';
+            ++game_input->text_stream.last_index;
+          } break;
+          
+          case VK_OEM_PERIOD: {
+            game_input->text_stream.stream[game_input->text_stream.last_index] = '.';
+            ++game_input->text_stream.last_index;
+          } break;
+          
+          case '!': {
+            game_input->text_stream.stream[game_input->text_stream.last_index] = '!';
+            ++game_input->text_stream.last_index;
+          } break;
+          
+#if 0
+          case ':':
+          case '-':
+          case '+':
+          case '?':
+          case '\'':
+          case '\"':
+          case '!':
+          case '@':
+          case '#':
+          case '$':
+          case '%':
+          case '&':
+          case '*':
+          case '(':
+          case ')':
+          case '[':
+          case ']':
+          case '{':
+          case '}':
+          case '=':
+          case '\\':
+          case '|':
+          case '/':
+          
 #endif
-      
+          default: {
+            game_input->text_stream.stream[game_input->text_stream.last_index] = CAST(S8) key;
+            ++game_input->text_stream.last_index;
+          }
+        }
+      }
       
       switch (key) {
         case VK_F9: {
@@ -852,7 +874,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
           
           for (i = 0; i < GAME_INPUT_TEXT_STREAM_LENGTH; ++i) {
             game_input->text_stream.stream[i] = 0;
-            game_input->text_stream.last_index = 0;
+            game_input->text_stream.last_index = 0; /* NOTE: is this necessary? */
           };
         }
       }
