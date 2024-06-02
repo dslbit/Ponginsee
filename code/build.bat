@@ -16,7 +16,7 @@ pushd ..\build\
 rem GAME CODE COMPILATION
 del *.pdb > NUL 2> NUL
 echo WAITING FOR GAME PDB > lock.tmp
-del *.raddbg > NUL 2> NUl
+rem del *.raddbg > NUL 2> NUl
 cl %common_debug_compiler_flags% %common_compiler_flags% /LD %game_file% /link /PDB:pong_%random%.pdb %debug_linker_flags% %common_linker_flags% /export:game_update_and_render
 del lock.tmp
 

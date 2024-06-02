@@ -2,6 +2,8 @@
 
 /*
 -* TODO: Cleanup Win32 locals?
+-* TODO: Force assert or differentiate between debug/regular assert macros -
+-* check the places where it would be needed
 -*
 -* NOTE: This platform layer doesn't assume the game will have a flexible-free
 -* aspect ratio. The *back buffer* has a fixed 16:9 small aspect ratio
@@ -46,12 +48,12 @@ __debugbreak();\
 #define WIN32_BACK_BUFFER_BYTES_PER_PIXEL (WIN32_BACK_BUFFER_BITS_PER_PIXEL / 8)
 #define WIN32_BACK_BUFFER_STRIDE (WIN32_BACK_BUFFER_WIDTH * WIN32_BACK_BUFFER_BYTES_PER_PIXEL)
 
-#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <timeapi.h>
 #include <strsafe.h>
 #include <wchar.h>
 #include <windowsx.h>
+#include <dsound.h>
 
 typedef struct Win32BackBuffer Win32BackBuffer;
 struct Win32BackBuffer {
@@ -69,6 +71,15 @@ struct Win32GameCode {
   B32 is_valid;
 };
 
+typedef struct Win32SoundBuffer Win32SoundBuffer;
+struct Win32SoundBuffer {
+  S32 channel_count;
+  S32 samples_per_second;
+  S32 bytes_per_sample;
+  S32 size; /* in bytes */
+  LPDIRECTSOUNDBUFFER memory;
+};
+
 typedef struct Win32State Win32State;
 struct Win32State { /* TODO: add game memory info */
   B32 is_running; /* main game loop */
@@ -84,6 +95,7 @@ struct Win32State { /* TODO: add game memory info */
   WINDOWPLACEMENT prev_window_placement;
   HANDLE fiber_main;
   HANDLE fiber_message;
+  Win32SoundBuffer sound_buffer;
 };
 
 GLOBAL Win32State global_state;
@@ -207,6 +219,92 @@ INTERNAL void win32_change_key_state(GameButtonState *button, B32 pressed, B32 r
   ASSERT(button != 0, L"'win32_key_event_helper' failed! Null 'button'!");
   button->pressed = pressed;
   button->released = released;
+}
+
+typedef HRESULT WINAPI DirectSoundCreateFuncType(LPGUID lpGuid, LPDIRECTSOUND* ppDS, LPUNKNOWN pUnkOuter);
+INTERNAL void win32_init_audio(HWND window) {
+  HMODULE dsound_dll;
+  DirectSoundCreateFuncType *direct_sound_create;
+  LPDIRECTSOUND direct_sound;
+  
+  dsound_dll = LoadLibraryA("dsound.dll");
+  ASSERT(dsound_dll != 0, L"Direct Sound DLL wasn't found in the system!"); /* @IMPORTANT: Force assert */
+  
+  direct_sound_create = CAST(DirectSoundCreateFuncType *) GetProcAddress(dsound_dll, "DirectSoundCreate");
+  ASSERT(direct_sound_create != 0, L"Failed to get the address of the \'DIrectSoundCreate\' function"); /* @IMPORTANT: Force assert */
+  
+  direct_sound = 0;
+  if (!SUCCEEDED(direct_sound_create(0, &direct_sound, 0))) {
+    ASSERT(0, L"Failed to initialized the Direct Sound API!"); /* @IMPORTANT: Force assert */
+  }
+  if (!SUCCEEDED(direct_sound->lpVtbl->SetCooperativeLevel(direct_sound, window, DSSCL_PRIORITY))) {
+    ASSERT(0, L"Failed to initialized the Direct Sound API!"); /* @IMPORTANT: Force assert */
+  }
+  
+  /* Setting up DS info */
+  {
+    LPDIRECTSOUNDBUFFER primary_buffer;
+    DSBUFFERDESC primary_buffer_description = {0};
+    DSBUFFERDESC secondary_buffer_description = {0};
+    WAVEFORMATEX wave_format = {0};
+    
+    global_state.sound_buffer.channel_count = 2;
+    global_state.sound_buffer.samples_per_second = 44100;
+    global_state.sound_buffer.bytes_per_sample = global_state.sound_buffer.channel_count * sizeof(S16);
+    global_state.sound_buffer.size = global_state.sound_buffer.samples_per_second * global_state.sound_buffer.bytes_per_sample;
+    
+    primary_buffer_description.dwSize = sizeof(primary_buffer_description);
+    primary_buffer_description.dwFlags = DSBCAPS_PRIMARYBUFFER;
+    if (!SUCCEEDED(direct_sound->lpVtbl->CreateSoundBuffer(direct_sound, &primary_buffer_description, &primary_buffer, 0))) {
+      ASSERT(0, L"Failed to create the primary Direct Sound buffer!"); /* @IMPORTANT: Force assert */
+    }
+    
+    wave_format.wFormatTag = WAVE_FORMAT_PCM;
+    wave_format.nChannels = CAST(WORD) global_state.sound_buffer.channel_count;
+    wave_format.nSamplesPerSec = global_state.sound_buffer.samples_per_second;
+    wave_format.wBitsPerSample = 16;
+    wave_format.nBlockAlign = wave_format.nChannels * wave_format.wBitsPerSample / 8;
+    wave_format.nAvgBytesPerSec = wave_format.nSamplesPerSec * wave_format.nBlockAlign;
+    
+    secondary_buffer_description.dwSize = sizeof(secondary_buffer_description);
+    secondary_buffer_description.dwFlags = DSBCAPS_GLOBALFOCUS;
+    secondary_buffer_description.dwBufferBytes = global_state.sound_buffer.size;
+    secondary_buffer_description.lpwfxFormat = &wave_format;
+    if (!SUCCEEDED(direct_sound->lpVtbl->CreateSoundBuffer(direct_sound, &secondary_buffer_description, &global_state.sound_buffer.memory, 0))) {
+      ASSERT(0, L"Failed to create the secondary Direct Sound buffer!"); /* @IMPORTANT: Force assert */
+    }
+  }
+}
+
+INTERNAL void win32_debug_clear_sound_buffer() {
+  void *region_1, *region_2;
+  DWORD region_1_size, region_2_size;
+  
+  if (!SUCCEEDED(global_state.sound_buffer.memory->lpVtbl->Lock(global_state.sound_buffer.memory, 0, global_state.sound_buffer.size, &region_1, &region_1_size, &region_2, &region_2_size, 0))) {
+    ASSERT(0, L"Failed to obtain the Direct Sound pointer needed to write the audio data!"); /* @IMPORTANT: Force assert */
+  } else {
+    S16 *at;
+    S16 sample;
+    S32 region_1_sample_count, region_2_sample_count;
+    S32 i;
+    
+    sample = 0;
+    
+    region_1_sample_count = region_1_size / global_state.sound_buffer.bytes_per_sample;
+    at = region_1;
+    for (i = 0; i < region_1_sample_count; ++i) {
+      *at++ = sample;
+      *at++ = sample;
+    }
+    
+    region_2_sample_count = region_2_size / global_state.sound_buffer.bytes_per_sample;
+    at = region_2;
+    for (i = 0; i < region_2_sample_count; ++i) {
+      *at++ = sample;
+      *at++ = sample;
+    }
+  }
+  
 }
 
 INTERNAL LRESULT CALLBACK win32_window_callback(HWND window, UINT msg, WPARAM wparam, LPARAM lparam) {
@@ -640,6 +738,15 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, PWSTR cmd_line,
     }
     ASSERT(window != 0, L"Invalid main window handle - Window couldn't be created by Windows!");
     SetWindowLongW(window, GWL_STYLE, GetWindowLongW(window, GWL_STYLE) & WIN32_MAIN_WINDOW_REMOVED_STYLES);
+  }
+  
+  /* Setup Audio (Direct Sound) */
+  {
+    win32_init_audio(window);
+    win32_debug_clear_sound_buffer();
+    if (!SUCCEEDED(global_state.sound_buffer.memory->lpVtbl->Play(global_state.sound_buffer.memory, 0, 0, DSBPLAY_LOOPING))) {
+      ASSERT(0, L"Failed to play sound using Direct Sound!");
+    }
   }
   
   /* Game window message loop */
